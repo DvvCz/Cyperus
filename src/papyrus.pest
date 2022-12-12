@@ -1,0 +1,83 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ multiline_style1 | multiline_style2 | line_comment }
+	multiline_style1 = _{"{" ~ (!"}" ~ ANY)* ~ "}"}
+	multiline_style2 = _{";/*" ~ (!"*/;" ~ ANY)* ~ "*/;"}
+	line_comment = _{";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE}
+
+module = _ { SOI ~ heading* ~ statement_like* ~ EOI }
+
+keyword = _{
+	^"Function" | ^"EndFunction" |
+	^"Property" | ^"EndProperty" |
+	^"Event" | ^"EndEvent" |
+	^"State" | ^"EndState" |
+
+	^"If" | ^"Elseif" | ^"EndIf" |
+
+	^"Auto" | ^"Conditional" | ^"Extends" |
+	^"Return"
+}
+
+type_ = _{ !keyword ~ ident }
+
+heading = _{ scriptname }
+	scriptname = { ^"ScriptName" ~ ident ~ ^"Extends" ~ type_ ~ ^"Conditional"? }
+
+statement_like = _{ statement }
+
+statement = { if_ | property | function | return_ | definition | event | while_ | state | assignment | compound_assignment | declaration }
+	property = _{ full_property | auto_conditional_property | auto_property | const_property }
+		// Wish I could verify the type of the setter parameter and getter return type matches with the property type at parse time.
+		// Seems you can't do that with pest, since PUSH doesn't go beyond one level? Either way this is too complex.
+		// Will just verify in the ast building level.
+		full_property = { type_ ~ ^"Property" ~ ident ~ (function ~ function?) ~ ^"EndProperty" }
+			// setter = { ^"Function" ~ "set" ~ "(" ~ type_ ~ ident ~ ")"~ statement_like* ~ ^"EndFunction" }
+			// getter = { type_ ~ ^"Function" ~ "get" ~ "()" ~ statement_like* ~ ^"EndFunction" }
+		auto_conditional_property = { (^"Int" | ^"Float" | ^"Bool") ~ ^"Property" ~ ident ~ ^"Auto" ~ ^"Conditional" }
+		auto_property = { type_ ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ ^"Auto" }
+		const_property = { type_ ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" }
+
+	state = { ^"State" ~ ident }
+	event = { ^"Event" ~ ident ~ "(" ~ parameters? ~ ")" ~ statement_like* ~ ^"EndEvent" }
+
+	// Control flow
+	if_ = { ^"If" ~ expression ~ statement_like* ~ (^"ElseIf" ~ expression ~ statement_like*)* ~ (^"Else" ~ statement_like*)? ~ ^"EndIf" }
+	while_ = { ^"While" ~ expression ~ statement_like* ~ ^"EndWhile" }
+	function = { function_header ~ statement_like* ~ ^"EndFunction" }
+		function_start = @{ (type_ ~ WHITESPACE)? ~ ^"Function" }
+		function_header = _{ function_start ~ ident ~ "(" ~ parameters? ~ ")" }
+	return_ = { ^"Return" ~ expression? }
+
+	assignment = { ident ~ ("." ~ ident)* ~ "=" ~ expression }
+	compound_assignment = { ident ~ comp_op ~ expression }
+		comp_op = _{ "+=" | "-=" | "*=" | "/=" }
+	definition = { type_ ~ ident ~ "=" ~ expression }
+	declaration = @{ type_ ~ WHITESPACE ~ ident ~ (WHITESPACE | COMMENT | EOI) }
+
+	parameters = { (parameter ~ ",")* ~ parameter? }
+		parameter = _{ type_ ~ ident }
+
+expression = { exp ~ (infix ~ exp)* }
+	exp = { prefix* ~ primary ~ postfix* }
+	infix = { arithmetic | comparison | logical }
+		arithmetic = { "+" | "-" | "*" | "/" | "^" }
+		comparison = { "==" | "!=" | ">=" | "<=" | "<" | ">" }
+		logical = { "&&" | "||" }
+	prefix = _{ neg | not }
+		neg = { "-" }
+		not = { "!" }
+	postfix = { cast | call | index }
+		cast = { ^"As" ~ type_ }
+		call = { "(" ~ arguments ~ ")" }
+			arguments = { (expression ~ ",")* ~ expression? }
+		index = { "." ~ ident }
+
+primary = { group | literal | ident }
+	literal = { string | number | boolean }
+		string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" } // Todo: Escapes
+		number = { float | integer }
+			float = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+			integer = @{ ASCII_DIGIT+ }
+		boolean = { ^"True" | ^"False" }
+	ident = @{ !keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ) }
+	group = _{ "(" ~ expression ~ ")" }
