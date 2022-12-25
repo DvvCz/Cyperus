@@ -46,7 +46,15 @@ pub type Type = String;
 pub enum Statement {
 	/// Vector of conditions and statements.
 	/// Condition is None in case of `else`.
-	If(Vec<(Option<Expression>, Vec<Self>)>),
+	If {
+		cond: Expression,
+		body: Vec<Self>,
+
+		elifs: Vec<(Expression, Vec<Self>)>,
+
+		else_block: Option<Vec<Self>>
+	},
+
 	While {
 		cond: Expression,
 		body: Vec<Self>,
@@ -90,6 +98,12 @@ pub enum Statement {
 		name: String,
 		body: Vec<Self>,
 	},
+
+	Definition {
+		ty: Type,
+		name: String,
+		value: Expression,
+	},
 }
 
 #[non_exhaustive]
@@ -116,202 +130,226 @@ pub enum Op {
 	Neg,
 	/// !
 	Not,
-
-	/// Postfix Operations
-	Cast,
-	Call,
-	Index
 }
 
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum Expression {
+	/// X + 4 * 2
 	BinaryOperation(Box<Self>, Op, Box<Self>),
+
+	/// !True
 	UnaryOperation(Op, Box<Self>),
 
+	/// 2414 as int
+	Cast(Box<Self>, Type),
+
+	/// Foo is int
+	Is(Box<Self>, Type),
+
+	/// Hello
 	Ident(String),
+
+	/// True or false
 	LiteralBool(bool),
+
+	/// "String"
 	LiteralString(String),
+
+	/// 2
 	LiteralInteger(i64),
+
+	/// 0.4f or 0.2
 	LiteralFloat(f64),
+
+	/// new int[5]
+	LiteralArray(Type),
 }
 
-pub fn parse_expr(pairs: &mut Pairs<Rule>) -> Expression {
-	use once_cell::sync::Lazy;
-	static PrattParser: Lazy<PrattParser<Rule>> = Lazy::new(|| {
-		use pest::pratt_parser::{Assoc::*, Op};
-
-		PrattParser::new()
-			.op(Op::infix(Rule::eq, Left)
-				| Op::infix(Rule::neq, Left)
-				| Op::infix(Rule::geq, Left)
-				| Op::infix(Rule::leq, Left)
-				| Op::infix(Rule::gt, Left)
-				| Op::infix(Rule::lt, Left))
-			.op(Op::infix(Rule::add, Left) | Op::infix(Rule::sub, Left))
-			.op(Op::infix(Rule::mul, Left) | Op::infix(Rule::div, Left))
-			.op(Op::prefix(Rule::not) | Op::prefix(Rule::neg))
-	});
-
-	PrattParser
-		.map_primary(|prim| match prim.as_rule() {
-			Rule::float => Expression::LiteralFloat(prim.as_str().parse().unwrap()),
-			Rule::integer => Expression::LiteralInteger(prim.as_str().parse().unwrap()),
-			Rule::ident => Expression::Ident(prim.as_str().to_owned()),
-			unknown => todo!("expr: {unknown:#?}"),
-		})
-		.map_infix(|lhs, op, rhs| {
-			let op = match op.as_rule() {
-				Rule::add => Op::Add,
-				Rule::sub => Op::Sub,
-				Rule::mul => Op::Mul,
-				Rule::div => Op::Div,
-				Rule::eq => Op::Eq,
-				Rule::neq => Op::Neq,
-				rule => unreachable!("parse_expr expected infix operation, found {:?}", rule),
-			};
-
-			Expression::BinaryOperation(Box::new(lhs), op, Box::new(rhs))
-		})
-		.map_prefix(|op, rhs| {
-			let op = match op.as_rule() {
-				Rule::neg => Op::Neg,
-				Rule::not => Op::Not,
-				rule => unreachable!("parse_expr expected unary operation, found {:?}", rule),
-			};
-
-			Expression::UnaryOperation(op, Box::new(rhs))
-		})
-		.parse(pairs)
+#[inline(always)]
+fn next_inner<'a>(pairs: &'a mut Pairs<Rule>) -> Pairs<'a, Rule> {
+	pairs.next().unwrap().into_inner()
 }
 
-fn parse_body(pairs: &mut Pairs<Rule>) -> Result<Vec<Statement>> {
-	pairs.next().unwrap().into_inner().map(parse_stmt).collect()
+trait PestHelper<'a> {
+	fn parse_ident(&mut self) -> Result<String>;
+	fn parse_type(&mut self) -> Result<Type>;
+
+	fn parse_body(&mut self) -> Result<Vec<Statement>>;
+	fn parse_params(&mut self) -> Result<Vec<(Type, String)>>;
+
+	fn parse_optional_expr(&mut self) -> Option<Expression>;
+	fn parse_expr(&mut self) -> Result<Expression>;
+}
+
+impl<'a> PestHelper<'a> for Pairs<'a, Rule> {
+	fn parse_ident(&mut self) -> Result<String> {
+		Ok(self.next().unwrap().as_str().to_owned())
+	}
+
+	fn parse_type(&mut self) -> Result<Type> {
+		Ok(self.next().unwrap().as_str().to_owned())
+	}
+
+	fn parse_body(&mut self) -> Result<Vec<Statement>> {
+		next_inner(self).map(parse_stmt).collect()
+	}
+
+	fn parse_params(&mut self) -> Result<Vec<(Type, String)>> {
+		fn parse_param(param: Pair<Rule>) -> Result<(Type, String)> {
+			let mut inner = param.into_inner();
+			Ok((inner.parse_ident()?, inner.parse_type()?))
+		}
+
+		next_inner(self).map(parse_param).collect()
+	}
+
+	fn parse_optional_expr(&mut self) -> Option<Expression> {
+		self.next()
+			.map(|x| x.into_inner().parse_expr().ok())
+			.flatten()
+	}
+
+	fn parse_expr(&mut self) -> Result<Expression> {
+		use once_cell::sync::Lazy;
+		static PRATT_PARSER: Lazy<PrattParser<Rule>> = Lazy::new(|| {
+			use pest::pratt_parser::{Assoc::*, Op};
+
+			PrattParser::new()
+				.op(Op::infix(Rule::op_eq, Left)
+					| Op::infix(Rule::op_neq, Left)
+					| Op::infix(Rule::op_geq, Left)
+					| Op::infix(Rule::op_leq, Left)
+					| Op::infix(Rule::op_gt, Left)
+					| Op::infix(Rule::op_lt, Left))
+				.op(Op::infix(Rule::op_add, Left) | Op::infix(Rule::op_sub, Left))
+				.op(Op::infix(Rule::op_mul, Left) | Op::infix(Rule::op_div, Left))
+				.op(Op::prefix(Rule::not) | Op::prefix(Rule::neg))
+				.op(Op::postfix(Rule::cast) | Op::postfix(Rule::type_check))
+		});
+
+		Ok(PRATT_PARSER
+			.map_primary(|prim| match prim.as_rule() {
+				Rule::hexadecimal => Expression::LiteralInteger(prim.as_str().parse().unwrap()),
+				Rule::decimal => Expression::LiteralFloat(prim.as_str().parse().unwrap()),
+				Rule::integer => Expression::LiteralInteger(prim.as_str().parse().unwrap()),
+				Rule::ident => Expression::Ident(prim.as_str().to_owned()),
+				Rule::string => Expression::LiteralString(prim.as_str().to_owned()),
+				Rule::boolean => Expression::LiteralBool(prim.as_str().to_lowercase() == "true"),
+				Rule::array => Expression::LiteralArray(prim.as_str().to_owned()),
+				unknown => todo!("expr: {unknown:#?}"),
+			})
+			.map_infix(|lhs, op, rhs| {
+				let op = match op.as_rule() {
+					Rule::op_add => Op::Add,
+					Rule::op_sub => Op::Sub,
+					Rule::op_mul => Op::Mul,
+					Rule::op_div => Op::Div,
+					Rule::op_eq => Op::Eq,
+					Rule::op_neq => Op::Neq,
+					rule => unreachable!("parse_expr expected infix operation, found {:?}", rule),
+				};
+
+				Expression::BinaryOperation(Box::new(lhs), op, Box::new(rhs))
+			})
+			.map_prefix(|op, rhs| {
+				let op = match op.as_rule() {
+					Rule::neg => Op::Neg,
+					Rule::not => Op::Not,
+					rule => unreachable!("parse_expr expected unary operation, found {:?}", rule),
+				};
+
+				Expression::UnaryOperation(op, Box::new(rhs))
+			})
+			.map_postfix(|lhs, op| match op.as_rule() {
+				Rule::cast => Expression::Cast(Box::new(lhs), op.into_inner().as_str().to_owned()),
+				Rule::type_check => {
+					Expression::Is(Box::new(lhs), op.into_inner().as_str().to_owned())
+				}
+				rule => unreachable!("parse_expr expected postfix operation, found {:?}", rule),
+			})
+			.parse(next_inner(self)))
+	}
 }
 
 pub fn parse_stmt(stmt: Pair<Rule>) -> Result<Statement> {
 	let (rule, mut item) = (stmt.as_rule(), stmt.into_inner());
 
-	println!("parsing stmt");
-
 	let stmt = match rule {
 		Rule::r#if => {
-			let cond = parse_expr(&mut item.next().unwrap().into_inner());
-			println!("if {:#?}", cond);
+			let cond = item.parse_expr()?;
+			let body = item.parse_body()?;
 
-			if let Some(stmts) = item.next() {
-				let stmts = stmts.into_inner();
-				println!("stmts: {:#?}", stmts.as_str());
+			let mut elifs = vec![];
+			for elif in item.next().unwrap().into_inner() {
+				let mut inner = elif.into_inner();
+				elifs.push((inner.parse_expr()?, inner.parse_body()?));
 			}
 
-			todo!()
-		}
+			let else_block = item.next().map(|x| x.into_inner().parse_body().ok()).flatten();
 
-		Rule::full_property => {
-			let type_ = item.next().unwrap().as_str().to_owned();
-			let name = item.next().unwrap().as_str().to_owned();
+			Statement::If {
+				cond,
+				body,
 
-			let expr1 = item.next().map(|x| parse_expr(&mut item));
-			let expr2 = item.next().map(|x| parse_expr(&mut item));
+				elifs,
 
-			Statement::PropertyFull {
-				ty: type_,
-				name,
-				setter: expr1,
-				getter: expr2,
+				else_block
 			}
 		}
 
-		Rule::auto_property => {
-			let type_ = item.next().unwrap().as_str().to_owned();
-			let name = item.next().unwrap().as_str().to_owned();
+		Rule::full_property => Statement::PropertyFull {
+			ty: item.parse_type()?,
+			name: item.parse_ident()?,
+			setter: item.parse_optional_expr(),
+			getter: item.parse_optional_expr(),
+		},
 
-			let expr = item.next().map(|x| parse_expr(&mut item));
-			Statement::PropertyAuto {
-				ty: type_,
-				name,
-				value: expr,
-			}
-		}
+		Rule::auto_property => Statement::PropertyAuto {
+			ty: item.parse_type()?,
+			name: item.parse_ident()?,
+			value: item.parse_optional_expr(),
+		},
 
-		Rule::auto_conditional_property => {
-			let type_ = item.next().unwrap().as_str().to_owned();
-			let name = item.next().unwrap().as_str().to_owned();
+		Rule::const_property => Statement::PropertyAutoConst {
+			ty: item.parse_type()?,
+			name: item.parse_ident()?,
+			value: item.parse_expr()?,
+		},
 
-			match type_.to_ascii_lowercase().as_str() {
-				"int" | "float" | "bool" => (),
-				_ => panic!("Bad type for auto conditional property."),
-			}
+		Rule::auto_state => Statement::State {
+			auto: true,
+			name: item.parse_ident()?,
+			body: item.parse_body()?,
+		},
 
-			Statement::PropertyAutoConditional { ty: type_, name }
-		}
-
-		Rule::const_property => {
-			let type_ = item.next().unwrap().as_str().to_owned();
-			let name = item.next().unwrap().as_str().to_owned();
-
-			let expr = parse_expr(&mut item.next().unwrap().into_inner());
-			Statement::PropertyAutoConst {
-				ty: type_,
-				name,
-				value: expr,
-			}
-		}
-
-		Rule::auto_state => {
-			let name = item.next().unwrap().as_str().to_owned();
-			let body = parse_body(&mut item)?;
-
-			Statement::State {
-				auto: true,
-				name,
-				body
-			}
-		}
-
-		Rule::normal_state => {
-			let name = item.next().unwrap().as_str().to_owned();
-
-			let body = parse_body(&mut item)?;
-
-			Statement::State {
-				auto: false,
-				name,
-				body
-			}
+		Rule::normal_state => Statement::State {
+			auto: false,
+			name: item.parse_ident()?,
+			body: item.parse_body()?,
 		},
 
 		Rule::function => todo!("function"),
 		Rule::r#return => todo!("return"),
-		Rule::definition => todo!("definition"),
-		Rule::event => {
-			let name = item.next().unwrap().as_str().to_owned();
 
-			fn parse_params(pairs: &mut Pairs<Rule>) -> Result<Vec<(Type, String)>> {
-				let params = pairs
-					.next()
-					.unwrap()
-					.into_inner()
-					.map(|param| {
-						let mut data = param.into_inner();
-						( data.next().unwrap().as_str().to_owned(), data.next().unwrap().as_str().to_owned()  )
-					})
-					.collect::<Vec<_>>();
-
-				Ok(params)
-			}
-
-			let parameters = parse_params(&mut item)?;
-			let body = parse_body(&mut item)?;
-
-			Statement::Event { name, parameters, body }
+		Rule::definition => Statement::Definition {
+			ty: item.parse_type()?,
+			name: item.parse_ident()?,
+			value: item.parse_expr()?,
 		},
+
+		Rule::event => Statement::Event {
+			name: item.parse_ident()?,
+			parameters: item.parse_params()?,
+			body: item.parse_body()?,
+		},
+
 		Rule::r#while => todo!("while_"),
 		Rule::assignment => todo!("assignment"),
 		Rule::compound_assignment => todo!("compound_assignment"),
 		Rule::declaration => todo!("declaration"),
 
-		unknown => unreachable!("{unknown:#?}"),
+		unknown => todo!("Rule::{unknown:?}"),
 	};
 
 	Ok(stmt)
@@ -323,6 +361,7 @@ pub fn parse_module(source: impl AsRef<str>) -> Result<PapyrusAst> {
 
 	let mut statements = vec![];
 	let mut script_info = ScriptInfo::default();
+
 	for item in pairs.into_iter() {
 		match item.as_rule() {
 			Rule::heading => {
@@ -330,8 +369,8 @@ pub fn parse_module(source: impl AsRef<str>) -> Result<PapyrusAst> {
 				match item.as_rule() {
 					Rule::script_name => {
 						let mut pairs = item.into_inner();
-						script_info.script_name = pairs.next().unwrap().as_str().to_owned();
-						script_info.extended_type = pairs.next().unwrap().as_str().to_owned();
+						script_info.script_name = pairs.parse_ident()?;
+						script_info.extended_type = pairs.parse_type()?;
 						script_info.is_conditional = pairs.next().is_some();
 					}
 					_ => unreachable!(),
@@ -339,7 +378,9 @@ pub fn parse_module(source: impl AsRef<str>) -> Result<PapyrusAst> {
 			}
 
 			Rule::body => {
-				statements.extend( parse_body(&mut pairs)?);
+				for pair in item.into_inner() {
+					statements.push(parse_stmt(pair)?);
+				}
 			}
 
 			Rule::EOI => (),

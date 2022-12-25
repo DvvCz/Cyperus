@@ -4,7 +4,7 @@ COMMENT = _{ multiline_style1 | multiline_style2 | line_comment }
 	multiline_style2 = _{";/" ~ (!"/;" ~ ANY)* ~ "/;"}
 	line_comment = _{";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE}
 
-module = _ { SOI ~ heading* ~ statement_like* ~ EOI }
+module = _ { SOI ~ heading* ~ body ~ EOI }
 
 keyword = _{
 	^"Function" | ^"EndFunction" |
@@ -25,7 +25,8 @@ type = { ident ~ "[]"? }
 heading = _{ script_name }
 	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ ^"Conditional"? }
 
-statement_like = _{ statement }
+
+body = { (statement | expression)* }
 
 statement = _{ if | group | property | function | definition | event | while | state | assignment | compound_assignment | declaration }
 	group = { ^"Group" ~ ident ~ ^"CollapsedOnRef"? ~ property+ ~ ^"EndGroup" }
@@ -37,19 +38,20 @@ statement = _{ if | group | property | function | definition | event | while | s
 		const_property = { type ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" }
 
 	state = _{ auto_state | normal_state }
-		auto_state = { ^"Auto" ~ ^"State" ~ ident ~ statement_like* ~ ^"EndState" }
-		normal_state = { ^"State" ~ ident ~ statement_like* ~ ^"EndState" }
+		auto_state = { ^"Auto" ~ ^"State" ~ ident ~ body ~ ^"EndState" }
+		normal_state = { ^"State" ~ ident ~ body ~ ^"EndState" }
 
-	event = { ^"Event" ~ ident ~ parameters ~ statement_like* ~ ^"EndEvent" }
+	event = { ^"Event" ~ ident ~ parameters ~ body ~ ^"EndEvent" }
 
 	// Control flow
-	if = { ^"If" ~ expression ~ statement_like* ~ (^"ElseIf" ~ expression ~ statement_like*)* ~ (^"Else" ~ statement_like*)? ~ ^"EndIf" }
-	while = { ^"While" ~ expression ~ statement_like* ~ ^"EndWhile" }
+	if = { ^"If" ~ expression ~ body ~ elifs ~ (^"Else" ~ body)? ~ ^"EndIf" }
+		elifs = { (^"ElseIf" ~ expression ~ body)* }
+	while = { ^"While" ~ expression ~ body ~ ^"EndWhile" }
 
 	function = _{ native_function | global_function | method_function }
 		native_function = { function_start ~ ident ~ parameters ~ ^"Global"? ~ ^"Native" ~ ^"Global"? }
-		global_function = { function_start ~ ident ~ parameters ~ ^"Global" ~ (statement_like | return)* ~ ^"EndFunction" }
-		method_function = { function_start ~ ident ~ parameters ~ (statement_like | return)* ~ ^"EndFunction" }
+		global_function = { function_start ~ ident ~ parameters ~ ^"Global" ~ (statement | expression | return)* ~ ^"EndFunction" }
+		method_function = { function_start ~ ident ~ parameters ~ (statement | expression | return)* ~ ^"EndFunction" }
 			function_start = @{ (type ~ WHITESPACE)? ~ ^"Function" }
 	return = { ^"Return" ~ expression? }
 
@@ -64,9 +66,20 @@ statement = _{ if | group | property | function | definition | event | while | s
 
 expression = { expr ~ (infix ~ expr)* }
 	expr = _{ prefix* ~ operand ~ postfix* }
-	infix = { arithmetic | comparison | logical }
-		arithmetic = { "+" | "-" | "*" | "/" | "%" }
-		comparison = { "==" | "!=" | ">=" | "<=" | "<" | ">" }
+	infix = _{ arithmetic | comparison | logical }
+		arithmetic = _{ op_add | op_sub | op_mul | op_div | op_mod }
+			op_add = { "+" }
+			op_sub = { "-" }
+			op_mul = { "*" }
+			op_div = { "/" }
+			op_mod = { "%" }
+		comparison = _{ op_eq | op_neq | op_geq | op_gt | op_leq | op_lt }
+			op_eq = { "==" }
+			op_neq = { "!=" }
+			op_geq = { ">=" }
+			op_gt = { ">" }
+			op_leq = { "<=" }
+			op_lt = { "<" }
 		logical = { "&&" | "||" }
 	prefix = _{ neg | not } // might have + operator too.
 		neg = { "-" }
@@ -79,10 +92,10 @@ expression = { expr ~ (infix ~ expr)* }
 		dot_index = { "." ~ ident }
 		expr_index = { "[" ~ expression ~ "]" }
 
-operand = { "(" ~ expression ~ ")" | literal | ident }
-	literal = { string | number | boolean | array }
+operand = _{ "(" ~ expression ~ ")" | literal | ident }
+	literal = _{ string | number | boolean | array }
 		string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" } // Todo: Escapes
-		number = { hexadecimal | decimal | integer }
+		number = _{ hexadecimal | decimal | integer }
 			hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
 			decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "f"? }
 			integer = @{ ASCII_DIGIT+ }
