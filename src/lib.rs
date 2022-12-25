@@ -6,8 +6,3 @@ extern crate pest_derive;
 pub struct PapyrusParser;
 
 mod ast;
-
-fn main() {
-	let out = ast::parse_papyrus("int x = 5");
-	println!("{out:#?}");
-}

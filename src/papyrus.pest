@@ -1,7 +1,7 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT = _{ multiline_style1 | multiline_style2 | line_comment }
 	multiline_style1 = _{"{" ~ (!"}" ~ ANY)* ~ "}"}
-	multiline_style2 = _{";/*" ~ (!"*/;" ~ ANY)* ~ "*/;"}
+	multiline_style2 = _{";/" ~ (!"/;" ~ ANY)* ~ "/;"}
 	line_comment = _{";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE}
 
 module = _ { SOI ~ heading* ~ statement_like* ~ EOI }
@@ -11,73 +11,81 @@ keyword = _{
 	^"Property" | ^"EndProperty" |
 	^"Event" | ^"EndEvent" |
 	^"State" | ^"EndState" |
+	^"Group" | ^"EndGroup" |
 
 	^"If" | ^"Elseif" | ^"EndIf" |
 
 	^"Auto" | ^"Conditional" | ^"Extends" |
-	^"Return"
+	^"Return" | ^"New" |
+	^"Const" | ^"Native" | ^"Global" | ^"Conditional" | ^"Mandatory"
 }
 
-type_ = _{ !keyword ~ ident }
+type = { ident ~ "[]"? }
 
-heading = _{ scriptname }
-	scriptname = { ^"ScriptName" ~ ident ~ ^"Extends" ~ type_ ~ ^"Conditional"? }
+heading = _{ script_name }
+	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ ^"Conditional"? }
 
 statement_like = _{ statement }
 
-statement = { if_ | property | function | return_ | definition | event | while_ | state | assignment | compound_assignment | declaration }
-	property = _{ full_property | auto_conditional_property | auto_property | const_property }
-		// Wish I could verify the type of the setter parameter and getter return type matches with the property type at parse time.
-		// Seems you can't do that with pest, since PUSH doesn't go beyond one level? Either way this is too complex.
-		// Will just verify in the ast building level.
-		full_property = { type_ ~ ^"Property" ~ ident ~ (function ~ function?) ~ ^"EndProperty" }
-			// setter = { ^"Function" ~ "set" ~ "(" ~ type_ ~ ident ~ ")"~ statement_like* ~ ^"EndFunction" }
-			// getter = { type_ ~ ^"Function" ~ "get" ~ "()" ~ statement_like* ~ ^"EndFunction" }
-		auto_conditional_property = { (^"Int" | ^"Float" | ^"Bool") ~ ^"Property" ~ ident ~ ^"Auto" ~ ^"Conditional" }
-		auto_property = { type_ ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ ^"Auto" }
-		const_property = { type_ ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" }
+statement = _{ if | group | property | function | definition | event | while | state | assignment | compound_assignment | declaration }
+	group = { ^"Group" ~ ident ~ ^"CollapsedOnRef"? ~ property+ ~ ^"EndGroup" }
 
-	state = { ^"State" ~ ident }
-	event = { ^"Event" ~ ident ~ "(" ~ parameters? ~ ")" ~ statement_like* ~ ^"EndEvent" }
+	property = _{ full_property | auto_property | const_property }
+		full_property = { type ~ ^"Property" ~ ident ~ (function ~ function?) ~ ^"EndProperty" }
+		// auto_conditional_property = { (^"Int" | ^"Float" | ^"Bool") ~ ^"Property" ~ ident ~ ^"Auto" ~ ^"Conditional" }
+		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional")* }
+		const_property = { type ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" }
+
+	state = _{ auto_state | normal_state }
+		auto_state = { ^"Auto" ~ ^"State" ~ ident ~ statement_like* ~ ^"EndState" }
+		normal_state = { ^"State" ~ ident ~ statement_like* ~ ^"EndState" }
+
+	event = { ^"Event" ~ ident ~ parameters ~ statement_like* ~ ^"EndEvent" }
 
 	// Control flow
-	if_ = { ^"If" ~ expression ~ statement_like* ~ (^"ElseIf" ~ expression ~ statement_like*)* ~ (^"Else" ~ statement_like*)? ~ ^"EndIf" }
-	while_ = { ^"While" ~ expression ~ statement_like* ~ ^"EndWhile" }
-	function = { function_header ~ statement_like* ~ ^"EndFunction" }
-		function_start = @{ (type_ ~ WHITESPACE)? ~ ^"Function" }
-		function_header = _{ function_start ~ ident ~ "(" ~ parameters? ~ ")" }
-	return_ = { ^"Return" ~ expression? }
+	if = { ^"If" ~ expression ~ statement_like* ~ (^"ElseIf" ~ expression ~ statement_like*)* ~ (^"Else" ~ statement_like*)? ~ ^"EndIf" }
+	while = { ^"While" ~ expression ~ statement_like* ~ ^"EndWhile" }
+
+	function = _{ native_function | global_function | method_function }
+		native_function = { function_start ~ ident ~ parameters ~ ^"Global"? ~ ^"Native" ~ ^"Global"? }
+		global_function = { function_start ~ ident ~ parameters ~ ^"Global" ~ (statement_like | return)* ~ ^"EndFunction" }
+		method_function = { function_start ~ ident ~ parameters ~ (statement_like | return)* ~ ^"EndFunction" }
+			function_start = @{ (type ~ WHITESPACE)? ~ ^"Function" }
+	return = { ^"Return" ~ expression? }
 
 	assignment = { ident ~ ("." ~ ident)* ~ "=" ~ expression }
-	compound_assignment = { ident ~ comp_op ~ expression }
-		comp_op = _{ "+=" | "-=" | "*=" | "/=" }
-	definition = { type_ ~ ident ~ "=" ~ expression }
-	declaration = @{ type_ ~ WHITESPACE ~ ident ~ (WHITESPACE | COMMENT | EOI) }
+	compound_assignment = { ident ~ ("+=" | "-=" | "*=" | "/=" | "%=") ~ expression }
 
-	parameters = { (parameter ~ ",")* ~ parameter? }
-		parameter = _{ type_ ~ ident }
+	definition = { type ~ ident ~ "=" ~ expression ~ ^"Const"? }
+	declaration = @{ type ~ WHITESPACE ~ ident ~ (WHITESPACE ~ ^"Const")? ~ (WHITESPACE | COMMENT | EOI) }
 
-expression = { exp ~ (infix ~ exp)* }
-	exp = { prefix* ~ primary ~ postfix* }
+	parameters = { "(" ~ (parameter ~ ",")* ~ parameter? ~ ")" }
+		parameter = _{ type ~ ident ~ ("=" ~ expression)? }
+
+expression = { expr ~ (infix ~ expr)* }
+	expr = _{ prefix* ~ operand ~ postfix* }
 	infix = { arithmetic | comparison | logical }
-		arithmetic = { "+" | "-" | "*" | "/" | "^" }
+		arithmetic = { "+" | "-" | "*" | "/" | "%" }
 		comparison = { "==" | "!=" | ">=" | "<=" | "<" | ">" }
 		logical = { "&&" | "||" }
-	prefix = _{ neg | not }
+	prefix = _{ neg | not } // might have + operator too.
 		neg = { "-" }
 		not = { "!" }
-	postfix = { cast | call | index }
-		cast = { ^"As" ~ type_ }
+	postfix = { type_check | cast | call | dot_index | expr_index }
 		call = { "(" ~ arguments ~ ")" }
 			arguments = { (expression ~ ",")* ~ expression? }
-		index = { "." ~ ident }
+		cast = { ^"As" ~ type }
+		type_check = { ^"Is" ~ type }
+		dot_index = { "." ~ ident }
+		expr_index = { "[" ~ expression ~ "]" }
 
-primary = { group | literal | ident }
-	literal = { string | number | boolean }
+operand = { "(" ~ expression ~ ")" | literal | ident }
+	literal = { string | number | boolean | array }
 		string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" } // Todo: Escapes
-		number = { float | integer }
-			float = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+		number = { hexadecimal | decimal | integer }
+			hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
+			decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "f"? }
 			integer = @{ ASCII_DIGIT+ }
 		boolean = { ^"True" | ^"False" }
+		array = { ^"New" ~ type ~ "[" ~ expression ~ "]" }
 	ident = @{ !keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ) }
-	group = _{ "(" ~ expression ~ ")" }
