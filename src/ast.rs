@@ -1,4 +1,7 @@
-use crate::{ast, error::Result};
+use crate::{
+	ast,
+	error::{Error, Result},
+};
 use pest::{
 	iterators::{Pair, Pairs},
 	pratt_parser::PrattParser,
@@ -21,23 +24,8 @@ struct ScriptInfo {
 #[derive(Debug)]
 pub struct PapyrusAst {
 	script_info: ScriptInfo,
-
 	statements: Vec<Statement>,
 }
-
-/*#[non_exhaustive]
-#[derive(Debug)]
-pub enum Type {
-	Bool,
-	Float,
-	Int,
-	String,
-	Var,
-
-	ObjectReference,
-
-	Other(String)
-}*/
 
 pub type Type = String;
 
@@ -52,7 +40,7 @@ pub enum Statement {
 
 		elifs: Vec<(Expression, Vec<Self>)>,
 
-		else_block: Option<Vec<Self>>
+		else_block: Option<Vec<Self>>,
 	},
 
 	While {
@@ -61,14 +49,25 @@ pub enum Statement {
 	},
 
 	Function {
-		return_type: Type,
+		return_type: Option<Type>,
 		name: String,
-		parameters: Vec<(Type, String)>,
+		parameters: Vec<Parameter>,
 		body: Vec<Self>,
 	},
+
+	NativeFunction {
+		return_type: Option<Type>,
+		name: String,
+		parameters: Vec<Parameter>,
+	},
+
+	Return {
+		value: Option<Expression>,
+	},
+
 	Event {
 		name: String,
-		parameters: Vec<(Type, String)>,
+		parameters: Vec<Parameter>,
 		body: Vec<Self>,
 	},
 
@@ -173,41 +172,59 @@ fn next_inner<'a>(pairs: &'a mut Pairs<Rule>) -> Pairs<'a, Rule> {
 
 trait PestHelper<'a> {
 	fn parse_ident(&mut self) -> Result<String>;
+	fn parse_optional_ident(&mut self) -> Option<String>;
 	fn parse_type(&mut self) -> Result<Type>;
 
 	fn parse_body(&mut self) -> Result<Vec<Statement>>;
-	fn parse_params(&mut self) -> Result<Vec<(Type, String)>>;
+	fn parse_params(&mut self) -> Result<Vec<Parameter>>;
 
 	fn parse_optional_expr(&mut self) -> Option<Expression>;
 	fn parse_expr(&mut self) -> Result<Expression>;
 }
 
+#[derive(Debug)]
+pub struct Parameter(Type, String, Option<Expression>);
+
 impl<'a> PestHelper<'a> for Pairs<'a, Rule> {
 	fn parse_ident(&mut self) -> Result<String> {
-		Ok(self.next().unwrap().as_str().to_owned())
+		Ok(self
+			.next()
+			.ok_or(Error::Expected("identifier", "end of input"))?
+			.as_str()
+			.to_owned())
+	}
+
+	fn parse_optional_ident(&mut self) -> Option<String> {
+		self.next().map(|i| i.as_str().to_owned())
 	}
 
 	fn parse_type(&mut self) -> Result<Type> {
-		Ok(self.next().unwrap().as_str().to_owned())
+		Ok(self
+			.next()
+			.ok_or(Error::Expected("type", "end of input"))?
+			.as_str()
+			.to_owned())
 	}
 
 	fn parse_body(&mut self) -> Result<Vec<Statement>> {
 		next_inner(self).map(parse_stmt).collect()
 	}
 
-	fn parse_params(&mut self) -> Result<Vec<(Type, String)>> {
-		fn parse_param(param: Pair<Rule>) -> Result<(Type, String)> {
+	fn parse_params(&mut self) -> Result<Vec<Parameter>> {
+		fn parse_param(param: Pair<Rule>) -> Result<Parameter> {
 			let mut inner = param.into_inner();
-			Ok((inner.parse_ident()?, inner.parse_type()?))
+			Ok(Parameter(inner.parse_type()?, inner.parse_ident()?, inner.parse_optional_expr()))
 		}
 
 		next_inner(self).map(parse_param).collect()
 	}
 
 	fn parse_optional_expr(&mut self) -> Option<Expression> {
-		self.next()
-			.map(|x| x.into_inner().parse_expr().ok())
-			.flatten()
+		if self.peek().is_some() {
+			self.parse_expr().ok()
+		} else {
+			None
+		}
 	}
 
 	fn parse_expr(&mut self) -> Result<Expression> {
@@ -286,7 +303,10 @@ pub fn parse_stmt(stmt: Pair<Rule>) -> Result<Statement> {
 				elifs.push((inner.parse_expr()?, inner.parse_body()?));
 			}
 
-			let else_block = item.next().map(|x| x.into_inner().parse_body().ok()).flatten();
+			let else_block = item
+				.next()
+				.map(|x| x.into_inner().parse_body().ok())
+				.flatten();
 
 			Statement::If {
 				cond,
@@ -294,7 +314,7 @@ pub fn parse_stmt(stmt: Pair<Rule>) -> Result<Statement> {
 
 				elifs,
 
-				else_block
+				else_block,
 			}
 		}
 
@@ -329,8 +349,29 @@ pub fn parse_stmt(stmt: Pair<Rule>) -> Result<Statement> {
 			body: item.parse_body()?,
 		},
 
-		Rule::function => todo!("function"),
-		Rule::r#return => todo!("return"),
+		Rule::native_function => Statement::NativeFunction {
+			return_type: item.parse_optional_ident(),
+			name: item.parse_ident()?,
+			parameters: item.parse_params()?,
+		},
+
+		Rule::global_function => Statement::Function {
+			return_type: item.parse_optional_ident(),
+			name: item.parse_ident()?,
+			parameters: item.parse_params()?,
+			body: item.parse_body()?
+		},
+
+		Rule::method_function => Statement::Function {
+			return_type: item.parse_optional_ident(),
+			name: item.parse_ident()?,
+			parameters: item.parse_params()?,
+			body: item.parse_body()?
+		},
+
+		Rule::r#return => Statement::Return {
+			value: item.parse_optional_expr()
+		},
 
 		Rule::definition => Statement::Definition {
 			ty: item.parse_type()?,

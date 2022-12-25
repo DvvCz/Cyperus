@@ -25,13 +25,12 @@ fn test_script_name() {
 
 #[test]
 fn test_group() {
-	for case in [
-		"Group MyGroup
+	for case in ["Group MyGroup
 			{A group containing properties}
 			int Property FirstProperty auto
 			float Property SecondProperty auto
-		EndGroup"
-	] {
+		EndGroup"]
+	{
 		should_parse(Rule::group, case);
 	}
 }

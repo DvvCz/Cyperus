@@ -5,13 +5,15 @@ extern crate pest_derive;
 #[grammar = "papyrus.pest"]
 pub struct PapyrusParser;
 
-mod error;
 mod ast;
+mod error;
 
 fn main() {
 	let src = "
 		int[] x = new int[5];
-		if True else endif
+		int function test(string foo = 5)
+			return 5
+		endfunction
 	";
 
 	let out = ast::parse_module(src);

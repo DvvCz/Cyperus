@@ -20,7 +20,7 @@ keyword = _{
 	^"Const" | ^"Native" | ^"Global" | ^"Conditional" | ^"Mandatory"
 }
 
-type = { ident ~ "[]"? }
+type = ${ ident ~ "[]"? }
 
 heading = _{ script_name }
 	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ ^"Conditional"? }
@@ -28,7 +28,7 @@ heading = _{ script_name }
 
 body = { (statement | expression)* }
 
-statement = _{ if | group | property | function | definition | event | while | state | assignment | compound_assignment | declaration }
+statement = _{ if | group | property | function | definition | event | while | state | assignment | compound_assignment | return | declaration }
 	group = { ^"Group" ~ ident ~ ^"CollapsedOnRef"? ~ property+ ~ ^"EndGroup" }
 
 	property = _{ full_property | auto_property | const_property }
@@ -50,8 +50,8 @@ statement = _{ if | group | property | function | definition | event | while | s
 
 	function = _{ native_function | global_function | method_function }
 		native_function = { function_start ~ ident ~ parameters ~ ^"Global"? ~ ^"Native" ~ ^"Global"? }
-		global_function = { function_start ~ ident ~ parameters ~ ^"Global" ~ (statement | expression | return)* ~ ^"EndFunction" }
-		method_function = { function_start ~ ident ~ parameters ~ (statement | expression | return)* ~ ^"EndFunction" }
+		global_function = { function_start ~ ident ~ parameters ~ ^"Global" ~ body ~ ^"EndFunction" }
+		method_function = { function_start ~ ident ~ parameters ~ body ~ ^"EndFunction" }
 			function_start = @{ (type ~ WHITESPACE)? ~ ^"Function" }
 	return = { ^"Return" ~ expression? }
 
@@ -62,7 +62,7 @@ statement = _{ if | group | property | function | definition | event | while | s
 	declaration = @{ type ~ WHITESPACE ~ ident ~ (WHITESPACE ~ ^"Const")? ~ (WHITESPACE | COMMENT | EOI) }
 
 	parameters = { "(" ~ (parameter ~ ",")* ~ parameter? ~ ")" }
-		parameter = _{ type ~ ident ~ ("=" ~ expression)? }
+		parameter = { type ~ ident ~ ("=" ~ expression)? }
 
 expression = { expr ~ (infix ~ expr)* }
 	expr = _{ prefix* ~ operand ~ postfix* }
