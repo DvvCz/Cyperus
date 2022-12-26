@@ -128,6 +128,15 @@ pub enum Expression {
 	/// Foo is int
 	Is(Box<Self>, Type),
 
+	/// foo.bar
+	DotIndex(Box<Self>, String),
+
+	/// foo[0]
+	BracketIndex(Box<Self>, Box<Self>),
+
+	/// foo(bar.qux, "baz", 123)
+	Call(Box<Self>, Vec<Self>),
+
 	/// Hello
 	Ident(String),
 

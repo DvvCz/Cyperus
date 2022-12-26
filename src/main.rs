@@ -9,11 +9,7 @@ mod error;
 mod parse;
 
 fn wrapper() -> error::Result<()> {
-	let src = "
-		hmm = new int[5]
-
-		x = foo + 5
-	";
+	let src = "x = 55[ff].xx(22, 33)";
 
 	let out = parse::parse_module(src)?;
 	println!("{out:#?}");

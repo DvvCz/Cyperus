@@ -213,13 +213,13 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 		// Todo: Make these functions fallible instead of panicking
 		fn primary(prim: Pair<Rule>) -> Expression {
 			match prim.as_rule() {
+				Rule::ident => Expression::Ident(prim.ident()),
 				Rule::hexadecimal => Expression::LiteralInteger(prim.as_str().parse().unwrap()),
 				Rule::decimal => Expression::LiteralFloat(prim.as_str().parse().unwrap()),
 				Rule::integer => Expression::LiteralInteger(prim.as_str().parse().unwrap()),
-				Rule::ident => Expression::Ident(prim.as_str().to_owned()),
 				Rule::string => Expression::LiteralString(prim.as_str().to_owned()),
 				Rule::boolean => Expression::LiteralBool(prim.as_str().to_lowercase() == "true"),
-				Rule::array => Expression::LiteralArray(prim.as_str().to_owned()),
+				Rule::array => Expression::LiteralArray(prim.ty()),
 				unknown => todo!("expr: {unknown:#?}"),
 			}
 		}
@@ -246,8 +246,11 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 
 		fn postfix(lhs: Expression, op: Pair<Rule>) -> Expression {
 			match op.as_rule() {
-				Rule::cast => Expression::Cast(Box::new(lhs), op.ident()),
-				Rule::type_check => Expression::Is(Box::new(lhs), op.ident()),
+				Rule::cast => Expression::Cast(Box::new(lhs), op.into_inner().next().unwrap().ident()),
+				Rule::type_check => Expression::Is(Box::new(lhs), op.into_inner().next().unwrap().ident()),
+				Rule::call => Expression::Call(Box::new(lhs), op.into_inner().next().unwrap().into_inner().map(PestNode::expression).collect::<Result<Vec<_>>>().unwrap()),
+				Rule::dot_index => Expression::DotIndex(Box::new(lhs), op.into_inner().next().unwrap().ident()),
+				Rule::bracket_index => Expression::BracketIndex(Box::new(lhs), Box::new(op.into_inner().next().unwrap().expression().unwrap())),
 				rule => unreachable!("Expected postfix operation, found {:?}", rule),
 			}
 		}
