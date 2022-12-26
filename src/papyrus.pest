@@ -14,6 +14,7 @@ keyword = _{
 	^"Group" | ^"EndGroup" |
 
 	^"If" | ^"Elseif" | ^"EndIf" |
+	^"While" | ^"EndWhile" |
 
 	^"Auto" | ^"Conditional" | ^"Extends" |
 	^"Return" | ^"New" |
@@ -28,14 +29,14 @@ heading = _{ script_name }
 
 body = { (statement | expression)* }
 
-statement = _{ if | group | property | function | definition | event | while | state | assignment | compound_assignment | return | declaration }
-	group = { ^"Group" ~ ident ~ ^"CollapsedOnRef"? ~ property+ ~ ^"EndGroup" }
+statement = _{ if | while | group | event | state | property | function | definition | assignment | compound_assignment | return | declaration }
+	group = { ^"Group" ~ ident ~ ^"CollapsedOnRef"? ~ body ~ ^"EndGroup" }
 
-	property = _{ full_property | auto_property | const_property }
+	property = _{ full_property | const_property | auto_property }
 		full_property = { type ~ ^"Property" ~ ident ~ (function ~ function?) ~ ^"EndProperty" }
 		// auto_conditional_property = { (^"Int" | ^"Float" | ^"Bool") ~ ^"Property" ~ ident ~ ^"Auto" ~ ^"Conditional" }
-		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional")* }
 		const_property = { type ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" }
+		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional")* }
 
 	state = _{ auto_state | normal_state }
 		auto_state = { ^"Auto" ~ ^"State" ~ ident ~ body ~ ^"EndState" }
@@ -55,7 +56,9 @@ statement = _{ if | group | property | function | definition | event | while | s
 			function_start = @{ (type ~ WHITESPACE)? ~ ^"Function" }
 	return = { ^"Return" ~ expression? }
 
-	assignment = { ident ~ ("." ~ ident)* ~ "=" ~ expression }
+	assignment = { ident ~ (dot_index | bracket_index)* ~ "=" ~ expression }
+		dot_index = { "." ~ ident }
+		bracket_index = { "[" ~ expression ~ "]" }
 	compound_assignment = { ident ~ ("+=" | "-=" | "*=" | "/=" | "%=") ~ expression }
 
 	definition = { type ~ ident ~ "=" ~ expression ~ ^"Const"? }
@@ -84,13 +87,11 @@ expression = { expr ~ (infix ~ expr)* }
 	prefix = _{ neg | not } // might have + operator too.
 		neg = { "-" }
 		not = { "!" }
-	postfix = { type_check | cast | call | dot_index | expr_index }
+	postfix = { type_check | cast | call | dot_index | bracket_index }
 		call = { "(" ~ arguments ~ ")" }
 			arguments = { (expression ~ ",")* ~ expression? }
 		cast = { ^"As" ~ type }
 		type_check = { ^"Is" ~ type }
-		dot_index = { "." ~ ident }
-		expr_index = { "[" ~ expression ~ "]" }
 
 operand = _{ "(" ~ expression ~ ")" | literal | ident }
 	literal = _{ string | number | boolean | array }
