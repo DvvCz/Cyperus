@@ -3,11 +3,13 @@ mod error;
 mod expression;
 
 use ast::{Ast, Expression, Index, Parameter, ScriptInfo, Statement};
-pub use error::{Error, Result};
+pub use error::{Error};
 use pest::{
 	iterators::{Pair, Pairs},
 	Parser,
 };
+
+type Result<T> = error::Result<'static, T>;
 
 #[derive(Parser)]
 #[grammar = "papyrus.pest"]
@@ -25,7 +27,7 @@ trait PestWalker {
 
 /// All of these functions assume they are on a node with the correct matching [Rule].
 /// Should only use these after using [PestWalker::expect_rule].
-trait PestNode<'a> {
+trait PestNode {
 	fn ident(self) -> String;
 	fn ty(self) -> String;
 	fn param(self) -> Result<Parameter>;
@@ -36,7 +38,7 @@ trait PestNode<'a> {
 	fn body(self) -> Result<Vec<Statement>>;
 }
 
-impl<'a> PestNode<'a> for Pair<'a, Rule> {
+impl<'a> PestNode for Pair<'a, Rule> {
 	#[inline(always)]
 	fn ident(self) -> String {
 		self.as_str().to_owned()
@@ -50,8 +52,8 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 	fn param(self) -> Result<Parameter> {
 		let mut inner = self.into_inner();
 		Ok(Parameter(
-			inner.expect_rule(Rule::ident)?.ident(),
 			inner.expect_rule(Rule::r#type)?.ty(),
+			inner.expect_rule(Rule::ident)?.ident(),
 			inner
 				.opt_rule(Rule::expression)
 				.and_then(|e| e.expression().ok()),
@@ -121,7 +123,7 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 			},
 
 			Rule::native_function => Statement::NativeFunction {
-				return_type: inner.opt_rule(Rule::ident).map(PestNode::ident),
+				return_type: inner.opt_rule(Rule::r#type).map(PestNode::ty),
 				name: inner.expect_rule(Rule::ident)?.ident(),
 				parameters: next_inner(&mut inner)
 					.map(PestNode::param)
@@ -129,7 +131,7 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 			},
 
 			Rule::global_function => Statement::Function {
-				return_type: inner.opt_rule(Rule::ident).map(PestNode::ident),
+				return_type: inner.opt_rule(Rule::r#type).map(PestNode::ty),
 				name: inner.expect_rule(Rule::ident)?.ident(),
 				parameters: next_inner(&mut inner)
 					.map(PestNode::param)
@@ -138,7 +140,7 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 			},
 
 			Rule::method_function => Statement::Function {
-				return_type: inner.opt_rule(Rule::ident).map(PestNode::ident),
+				return_type: inner.opt_rule(Rule::r#type).map(PestNode::ty),
 				name: inner.expect_rule(Rule::ident)?.ident(),
 				parameters: next_inner(&mut inner)
 					.map(PestNode::param)
@@ -214,12 +216,12 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 		fn primary(prim: Pair<Rule>) -> Expression {
 			match prim.as_rule() {
 				Rule::ident => Expression::Ident(prim.ident()),
-				Rule::hexadecimal => Expression::LiteralInteger(prim.as_str().parse().unwrap()),
-				Rule::decimal => Expression::LiteralFloat(prim.as_str().parse().unwrap()),
-				Rule::integer => Expression::LiteralInteger(prim.as_str().parse().unwrap()),
-				Rule::string => Expression::LiteralString(prim.as_str().to_owned()),
-				Rule::boolean => Expression::LiteralBool(prim.as_str().to_lowercase() == "true"),
-				Rule::array => Expression::LiteralArray(prim.ty()),
+				Rule::hexadecimal => Expression::Integer(prim.as_str().parse().unwrap()),
+				Rule::decimal => Expression::Float(prim.as_str().parse().unwrap()),
+				Rule::integer => Expression::Integer(prim.as_str().parse().unwrap()),
+				Rule::string => Expression::String(prim.as_str().to_owned()),
+				Rule::boolean => Expression::Bool(prim.as_str().to_lowercase() == "true"),
+				Rule::array => Expression::Array(prim.ty()),
 				unknown => todo!("expr: {unknown:#?}"),
 			}
 		}
@@ -279,10 +281,10 @@ impl<'a> PestWalker for Pairs<'a, Rule> {
 					self.next();
 					Ok(pair)
 				} else {
-					Err(Error::Expected(expecting, got))
+					Err(Error::Expected(expecting, got, pair.as_span().start(), pair.as_span().end()))
 				}
 			}
-			None => Err(Error::Expected(expecting, Rule::EOI)),
+			None => Err(Error::UnexpectedEOI(expecting)),
 		}
 	}
 

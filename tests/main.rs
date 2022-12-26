@@ -74,6 +74,7 @@ fn test_event() {
 	for case in [
 		"Event OnHit(ObjectReference akAggressor, Form akWeapon, Projectile akProjectile) EndEvent",
 		"Event Test() EndEvent",
+		"Event Test(int eventSomething) EndEvent"
 	] {
 		should_parse(Rule::event, case);
 	}

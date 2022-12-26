@@ -141,19 +141,19 @@ pub enum Expression {
 	Ident(String),
 
 	/// True or false
-	LiteralBool(bool),
+	Bool(bool),
 
 	/// "String"
-	LiteralString(String),
+	String(String),
 
 	/// 2
-	LiteralInteger(i64),
+	Integer(i64),
 
 	/// 0.4f or 0.2
-	LiteralFloat(f64),
+	Float(f64),
 
 	/// new int[5]
-	LiteralArray(Type),
+	Array(Type),
 }
 
 #[derive(Debug)]
