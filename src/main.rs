@@ -9,7 +9,10 @@ mod error;
 mod parse;
 
 fn wrapper() -> error::Result<()> {
-	let src = "int foo";
+	let src = "
+		int var;
+		while true endwhile
+	";
 
 	let out = parse::parse_module(src)?;
 	println!("{out:#?}");

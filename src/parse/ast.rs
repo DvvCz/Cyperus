@@ -85,6 +85,11 @@ pub enum Statement {
 		value: Expression,
 	},
 
+	Declaration {
+		ty: Type,
+		name: String,
+	},
+
 	Group {
 		name: String,
 		properties: Vec<Self>,

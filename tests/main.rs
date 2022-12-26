@@ -74,7 +74,7 @@ fn test_event() {
 	for case in [
 		"Event OnHit(ObjectReference akAggressor, Form akWeapon, Projectile akProjectile) EndEvent",
 		"Event Test() EndEvent",
-		"Event Test(int eventSomething) EndEvent"
+		"Event Test(int eventSomething) EndEvent",
 	] {
 		should_parse(Rule::event, case);
 	}
@@ -203,5 +203,12 @@ fn test_string() {
 fn test_ident() {
 	for case in ["hello", "HELLO", "TES_42T2"] {
 		should_parse(Rule::ident, case);
+	}
+}
+
+#[test]
+fn test_comment() {
+	for case in [";;;;", ";/\n\nTest\n\n/;", "{\n\n\n}", ";"] {
+		should_parse(Rule::COMMENT, case);
 	}
 }

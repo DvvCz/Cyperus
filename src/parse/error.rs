@@ -10,7 +10,7 @@ pub enum Error {
 	Expected(Rule, Rule, usize, usize),
 
 	#[error("Expected {0:?}, but got end of input.")]
-	UnexpectedEOI(Rule)
+	UnexpectedEOI(Rule),
 }
 
 pub type Result<'a, T> = std::result::Result<T, Error>;

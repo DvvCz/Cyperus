@@ -3,7 +3,7 @@ mod error;
 mod expression;
 
 use ast::{Ast, Expression, Index, Parameter, ScriptInfo, Statement};
-pub use error::{Error};
+pub use error::Error;
 use pest::{
 	iterators::{Pair, Pairs},
 	Parser,
@@ -205,6 +205,14 @@ impl<'a> PestNode for Pair<'a, Rule> {
 				expr: inner.expect_rule(Rule::expression)?.expression()?,
 			},
 
+			Rule::declaration => {
+				println!("{}", inner.as_str());
+				Statement::Declaration {
+					ty: inner.expect_rule(Rule::r#type)?.ty(),
+					name: inner.expect_rule(Rule::ident)?.ident(),
+				}
+			}
+
 			_ => todo!("{rule:?}"),
 		};
 
@@ -248,11 +256,29 @@ impl<'a> PestNode for Pair<'a, Rule> {
 
 		fn postfix(lhs: Expression, op: Pair<Rule>) -> Expression {
 			match op.as_rule() {
-				Rule::cast => Expression::Cast(Box::new(lhs), op.into_inner().next().unwrap().ident()),
-				Rule::type_check => Expression::Is(Box::new(lhs), op.into_inner().next().unwrap().ident()),
-				Rule::call => Expression::Call(Box::new(lhs), op.into_inner().next().unwrap().into_inner().map(PestNode::expression).collect::<Result<Vec<_>>>().unwrap()),
-				Rule::dot_index => Expression::DotIndex(Box::new(lhs), op.into_inner().next().unwrap().ident()),
-				Rule::bracket_index => Expression::BracketIndex(Box::new(lhs), Box::new(op.into_inner().next().unwrap().expression().unwrap())),
+				Rule::cast => {
+					Expression::Cast(Box::new(lhs), op.into_inner().next().unwrap().ident())
+				}
+				Rule::type_check => {
+					Expression::Is(Box::new(lhs), op.into_inner().next().unwrap().ident())
+				}
+				Rule::call => Expression::Call(
+					Box::new(lhs),
+					op.into_inner()
+						.next()
+						.unwrap()
+						.into_inner()
+						.map(PestNode::expression)
+						.collect::<Result<Vec<_>>>()
+						.unwrap(),
+				),
+				Rule::dot_index => {
+					Expression::DotIndex(Box::new(lhs), op.into_inner().next().unwrap().ident())
+				}
+				Rule::bracket_index => Expression::BracketIndex(
+					Box::new(lhs),
+					Box::new(op.into_inner().next().unwrap().expression().unwrap()),
+				),
 				rule => unreachable!("Expected postfix operation, found {:?}", rule),
 			}
 		}
@@ -281,7 +307,12 @@ impl<'a> PestWalker for Pairs<'a, Rule> {
 					self.next();
 					Ok(pair)
 				} else {
-					Err(Error::Expected(expecting, got, pair.as_span().start(), pair.as_span().end()))
+					Err(Error::Expected(
+						expecting,
+						got,
+						pair.as_span().start(),
+						pair.as_span().end(),
+					))
 				}
 			}
 			None => Err(Error::UnexpectedEOI(expecting)),

@@ -2,12 +2,12 @@ WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT = _{ multiline_style1 | multiline_style2 | line_comment }
 	multiline_style1 = _{"{" ~ (!"}" ~ ANY)* ~ "}"}
 	multiline_style2 = _{";/" ~ (!"/;" ~ ANY)* ~ "/;"}
-	line_comment = _{";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE}
+	line_comment = _{";" ~ (!NEWLINE ~ ANY)* ~ (NEWLINE | EOI)}
 
 module = _ { SOI ~ script_name? ~ body ~ EOI }
 	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ ^"Conditional"? }
 
-keyword = @{
+keyword = ${
 	(
 		^"Function" | ^"EndFunction" | ^"Property" | ^"EndProperty" | ^"Event" | ^"EndEvent" |
 		^"State" | ^"EndState" | ^"Group" | ^"EndGroup" | ^"If" | ^"Elseif" | ^"EndIf" |
@@ -16,7 +16,7 @@ keyword = @{
 	) ~ !ASCII_ALPHANUMERIC
 }
 
-type = ${ ident ~ "[]"? }
+type = ${ !keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ) ~ "[]"? }
 
 body = { (statement | expression)* }
 
@@ -53,7 +53,7 @@ statement = _{ if | while | group | event | state | property | function | defini
 	compound_assignment = { ident ~ ("+=" | "-=" | "*=" | "/=" | "%=") ~ expression }
 
 	definition = { type ~ ident ~ "=" ~ expression ~ ^"Const"? }
-	declaration = @{ type ~ WHITESPACE ~ ident ~ (WHITESPACE ~ ^"Const")? ~ (WHITESPACE | COMMENT | EOI) }
+	declaration = ${ type ~ (WHITESPACE | COMMENT) ~ ident ~ ((WHITESPACE | COMMENT) ~ ^"Const")? ~ (WHITESPACE | COMMENT | EOI) }
 
 	parameters = { "(" ~ (parameter ~ ",")* ~ parameter? ~ ")" }
 		parameter = { type ~ ident ~ ("=" ~ expression)? }
