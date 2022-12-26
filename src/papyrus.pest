@@ -5,30 +5,42 @@ COMMENT = _{ multiline_style1 | multiline_style2 | line_comment }
 	line_comment = _{";" ~ (!NEWLINE ~ ANY)* ~ (NEWLINE | EOI)}
 
 module = _ { SOI ~ script_name? ~ body ~ EOI }
-	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ ^"Conditional"? }
+	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ (^"Conditional" | ^"Const")* }
 
-keyword = ${
+keyword = @{
 	(
-		^"Function" | ^"EndFunction" | ^"Property" | ^"EndProperty" | ^"Event" | ^"EndEvent" |
-		^"State" | ^"EndState" | ^"Group" | ^"EndGroup" | ^"If" | ^"Elseif" | ^"EndIf" |
-		^"While" | ^"EndWhile" | ^"Auto" | ^"Conditional" | ^"Extends" | ^"Return" |
-		^"New" | ^"Const" | ^"Native" | ^"Global" | ^"Conditional" | ^"Mandatory"
+		^"As" | ^"Auto" | ^"AutoReadOnly" | ^"Bool" | ^"ElseIf" | ^"Else" |
+		^"EndEvent" | ^"EndFunction" | ^"EndIf" | ^"EndProperty" | ^"EndState" | ^"EndWhile" |
+		^"Event" | ^"Extends" | ^"False" | ^"Float" | ^"Function" | ^"Global" |
+		^"If" |	^"Import" | ^"Int" | ^"Length" | ^"Native" | ^"New" |
+		^"None" | ^"Parent" | ^"Property" | ^"Return" | ^"ScriptName" | ^"Self" |
+		^"State" | ^"String" | ^"True" | ^"While" |
+
+		// Fallout 4
+		^"EndStruct" | ^"Struct" |
+		^"EndGroup" | ^"Group" |
+
+		// These might not be keywords.
+		^"Const" | ^"Conditional"
 	) ~ !ASCII_ALPHANUMERIC
 }
 
-type = ${ !keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ) ~ "[]"? }
+type = ${ (!keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ) | ^"Int" | ^"Float" | ^"String" | ^"Bool") ~ "[]"? }
+
 
 body = { (statement | expression)* }
 
 // Todo: Make statement not silent
-statement = _{ if | while | group | event | state | property | function | definition | assignment | compound_assignment | return | declaration }
+statement = _{ if | while | group | event | state | struct | property | function | definition | assignment | compound_assignment | return | declaration }
 	group = { ^"Group" ~ ident ~ ^"CollapsedOnRef"? ~ body ~ ^"EndGroup" }
 
 	property = _{ full_property | const_property | auto_property }
 		full_property = { type ~ ^"Property" ~ ident ~ (function ~ function?) ~ ^"EndProperty" }
 		// auto_conditional_property = { (^"Int" | ^"Float" | ^"Bool") ~ ^"Property" ~ ident ~ ^"Auto" ~ ^"Conditional" }
 		const_property = { type ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" }
-		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional")* }
+		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ (^"Const" | ^"Mandatory" | ^"Conditional")* ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional")* }
+
+	struct = { ^"Struct" ~ ident ~ (type ~ ident ~ ("=" ~ expression)?) ~ ^"EndStruct" }
 
 	state = _{ auto_state | normal_state }
 		auto_state = { ^"Auto" ~ ^"State" ~ ident ~ body ~ ^"EndState" }

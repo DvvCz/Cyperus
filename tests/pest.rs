@@ -1,13 +1,12 @@
-#[macro_use]
-extern crate pest_derive;
+/*!
+	Testing the papyrus pest grammar.
+*/
 
-#[derive(Parser)]
-#[grammar = "papyrus.pest"]
-struct PapyrusParser;
+use cyperus::parse::{PestParser, Rule};
 
 fn should_parse(rule: Rule, source: impl AsRef<str>) {
 	use pest::Parser;
-	if let Err(why) = PapyrusParser::parse(rule, source.as_ref()) {
+	if let Err(why) = PestParser::parse(rule, source.as_ref()) {
 		panic!("Failed to parse: {why}");
 	}
 }
@@ -210,5 +209,25 @@ fn test_ident() {
 fn test_comment() {
 	for case in [";;;;", ";/\n\nTest\n\n/;", "{\n\n\n}", ";"] {
 		should_parse(Rule::COMMENT, case);
+	}
+}
+
+#[test]
+fn test_struct() {
+	for case in [
+		"Struct test
+			int foo
+		endstruct",
+		"struct test
+			int foo = 5
+		endstruct",
+		"struct t2
+			string xyz
+		endstruct",
+		"Struct Foo
+			Int Bar = 55
+		EndStruct",
+	] {
+		should_parse(Rule::r#struct, case);
 	}
 }

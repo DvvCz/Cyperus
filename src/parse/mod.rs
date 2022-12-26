@@ -1,3 +1,7 @@
+#[derive(Parser)]
+#[grammar = "papyrus.pest"]
+pub struct PestParser;
+
 mod ast;
 mod error;
 mod expression;
@@ -10,10 +14,6 @@ use pest::{
 };
 
 type Result<T> = error::Result<'static, T>;
-
-#[derive(Parser)]
-#[grammar = "papyrus.pest"]
-pub struct PestParser;
 
 #[inline(always)]
 fn next_inner<'a>(pairs: &'a mut Pairs<Rule>) -> Pairs<'a, Rule> {
@@ -205,13 +205,10 @@ impl<'a> PestNode for Pair<'a, Rule> {
 				expr: inner.expect_rule(Rule::expression)?.expression()?,
 			},
 
-			Rule::declaration => {
-				println!("{}", inner.as_str());
-				Statement::Declaration {
-					ty: inner.expect_rule(Rule::r#type)?.ty(),
-					name: inner.expect_rule(Rule::ident)?.ident(),
-				}
-			}
+			Rule::declaration => Statement::Declaration {
+				ty: inner.expect_rule(Rule::r#type)?.ty(),
+				name: inner.expect_rule(Rule::ident)?.ident(),
+			},
 
 			_ => todo!("{rule:?}"),
 		};
