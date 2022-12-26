@@ -62,11 +62,13 @@ pub enum Statement {
 		name: String,
 		functions: (Expression, Option<Expression>),
 	},
+
 	PropertyAuto {
 		ty: Type,
 		name: String,
 		value: Option<Expression>,
 	},
+
 	PropertyAutoConst {
 		ty: Type,
 		name: String,
@@ -116,15 +118,28 @@ pub enum Index {
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum Expression {
+	/// +
 	Addition(Box<Self>, Box<Self>),
+
+	/// -
 	Subtraction(Box<Self>, Box<Self>),
+
+	/// *
 	Multiplication(Box<Self>, Box<Self>),
+
+	/// /
 	Division(Box<Self>, Box<Self>),
 
+	/// ==
 	Equal(Box<Self>, Box<Self>),
+
+	/// !=
 	NotEqual(Box<Self>, Box<Self>),
 
+	/// !
 	Not(Box<Self>),
+
+	/// -
 	Negate(Box<Self>),
 
 	/// 2414 as int

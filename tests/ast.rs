@@ -11,7 +11,6 @@ macro_rules! github {
 }
 
 #[test]
-#[ignore = "nyi"]
 fn test_f4se() {
 	macro_rules! p {
 		($path:literal) => {

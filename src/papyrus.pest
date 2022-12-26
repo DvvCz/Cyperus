@@ -4,43 +4,50 @@ COMMENT = _{ multiline_style1 | multiline_style2 | line_comment }
 	multiline_style2 = _{";/" ~ (!"/;" ~ ANY)* ~ "/;"}
 	line_comment = _{";" ~ (!NEWLINE ~ ANY)* ~ (NEWLINE | EOI)}
 
-module = _ { SOI ~ script_name? ~ body ~ EOI }
-	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ (^"Conditional" | ^"Const")* }
+module = _ { SOI ~ header? ~ body ~ EOI }
+	// https://www.creationkit.com/fallout4/index.php?title=Script_File_Structure#Script_Extension
+	header = { ^"ScriptName" ~ ident ~ (^"Extends" ~ type)? ~ header_flag* }
+		header_flag = { ^"Conditional" | ^"Const" | ^"DebugOnly" | ^"BetaOnly" | ^"Hidden" | ^"Native" | ^"Default" }
 
 keyword = @{
 	(
-		^"As" | ^"Auto" | ^"AutoReadOnly" | ^"Bool" | ^"ElseIf" | ^"Else" |
-		^"EndEvent" | ^"EndFunction" | ^"EndIf" | ^"EndProperty" | ^"EndState" | ^"EndWhile" |
-		^"Event" | ^"Extends" | ^"False" | ^"Float" | ^"Function" | ^"Global" |
-		^"If" |	^"Import" | ^"Int" | ^"Length" | ^"Native" | ^"New" |
-		^"None" | ^"Parent" | ^"Property" | ^"Return" | ^"ScriptName" | ^"Self" |
-		^"State" | ^"String" | ^"True" | ^"While" |
+		/*
+			Skyrim Keywords
+			^"As" | ^"Auto" | ^"AutoReadOnly" | ^"Conditional" | ^"Else" | ^"ElseIf" |
+			^"EndEvent" | ^"EndFunction" | ^"EndIf" | ^"EndProperty" |^"EndState" |
+			^"EndWhile" | ^"Event" | ^"Extends" | ^"False" | ^"Function" | ^"Global" |
+			^"Hidden" | ^"If" | ^"Import" | ^"Length" | ^"Native" | ^"New" | ^"None" |
+			^"Parent" | ^"Property" | ^"Return" | ^"ScriptName" | ^"Self" | ^"State" |
+			^"True" | ^"While"
+		*/
 
-		// Fallout 4
-		^"EndStruct" | ^"Struct" |
-		^"EndGroup" | ^"Group" |
-
-		// These might not be keywords.
-		^"Const" | ^"Conditional"
+		^"As" | ^"Auto" | ^"AutoReadOnly" | ^"BetaOnly" | ^"Collapsed" |
+		^"CollapsedOnBase" | ^"CollapsedOnRef" | ^"Conditional" | ^"Const" |
+		^"CustomEvent" | ^"DebugOnly" | ^"Default" | ^"Else" | ^"ElseIf"|
+		^"EndEvent" | ^"EndFunction" | ^"EndGroup" | ^"EndIf" | ^"EndProperty" |
+		^"EndState" | ^"EndStruct" | ^"EndWhile" | ^"Event" | ^"Extends" |
+		^"False" | ^"Function" | ^"Global" | ^"Group" | ^"Hidden" | ^"If" |
+		^"Import" | ^"Is" /*| ^"Length"*/ | ^"Mandatory" | ^"Native" | ^"New" |
+		^"None" | ^"Parent" | ^"Property" | ^"Return" | ^"ScriptName" |
+		/*^"Self" |*/ ^"State" | ^"Struct" | ^"True" | ^"While"
 	) ~ !ASCII_ALPHANUMERIC
 }
 
-type = ${ (!keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ) | ^"Int" | ^"Float" | ^"String" | ^"Bool") ~ "[]"? }
+type = ${ (!keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* )) ~ (WHITESPACE? ~ "[]")? }
 
 
 body = { (statement | expression)* }
 
 // Todo: Make statement not silent
 statement = _{ if | while | group | event | state | struct | property | function | definition | assignment | compound_assignment | return | declaration }
-	group = { ^"Group" ~ ident ~ ^"CollapsedOnRef"? ~ body ~ ^"EndGroup" }
+	group = { ^"Group" ~ ident ~ (^"CollapsedOnRef" | ^"CollapsedOnBase" | ^"Collapsed")? ~ body ~ ^"EndGroup" }
 
 	property = _{ full_property | const_property | auto_property }
-		full_property = { type ~ ^"Property" ~ ident ~ (function ~ function?) ~ ^"EndProperty" }
-		// auto_conditional_property = { (^"Int" | ^"Float" | ^"Bool") ~ ^"Property" ~ ident ~ ^"Auto" ~ ^"Conditional" }
-		const_property = { type ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" }
-		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ (^"Const" | ^"Mandatory" | ^"Conditional")* ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional")* }
+		full_property = { type ~ ^"Property" ~ ident ~ (function ~ function?) ~ ^"EndProperty" ~ (^"Mandatory" | ^"Hidden")* }
+		const_property = { type ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" ~ (^"Mandatory" | ^"Hidden")* }
+		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ (^"Const" | ^"Mandatory" | ^"Conditional" | ^"Hidden")* ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional" | ^"Hidden")* }
 
-	struct = { ^"Struct" ~ ident ~ (type ~ ident ~ ("=" ~ expression)?) ~ ^"EndStruct" }
+	struct = { ^"Struct" ~ ident ~ (type ~ ident ~ ("=" ~ expression)? ~ ^"Hidden"?) ~ ^"EndStruct" }
 
 	state = _{ auto_state | normal_state }
 		auto_state = { ^"Auto" ~ ^"State" ~ ident ~ body ~ ^"EndState" }
@@ -92,12 +99,13 @@ expression = { expr ~ (infix ~ expr)* }
 		not = { "!" }
 	postfix = _{ type_check | cast | call | dot_index | bracket_index }
 		call = { "(" ~ arguments ~ ")" }
-			arguments = { (expression ~ ",")* ~ expression? }
+			arguments = { (argument ~ ",")* ~ argument? }
+				argument = { (ident ~ "=")? ~ expression }
 		cast = { ^"As" ~ type }
 		type_check = { ^"Is" ~ type }
 
 operand = _{ "(" ~ expression ~ ")" | literal | ident }
-	literal = _{ string | number | boolean | array }
+	literal = _{ string | number | boolean | none | array }
 		string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" } // Todo: Escapes
 		number = _{ hexadecimal | decimal | integer }
 			hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
@@ -105,4 +113,5 @@ operand = _{ "(" ~ expression ~ ")" | literal | ident }
 			integer = @{ ASCII_DIGIT+ }
 		boolean = { ^"True" | ^"False" }
 		array = { ^"New" ~ type ~ "[" ~ expression ~ "]" }
+		none = { ^"None" }
 	ident = @{ !keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ) }

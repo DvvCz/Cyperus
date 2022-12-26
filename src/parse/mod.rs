@@ -336,7 +336,7 @@ pub fn parse_module(source: impl AsRef<str>) -> Result<Ast> {
 
 	for item in pairs {
 		match item.as_rule() {
-			Rule::script_name => {
+			Rule::header => {
 				let mut inner = item.into_inner();
 				script_info.script_name = inner.expect_rule(Rule::ident)?.ident();
 				script_info.extended_type = inner.opt_rule(Rule::r#type).map(PestNode::ty);

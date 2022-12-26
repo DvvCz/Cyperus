@@ -12,13 +12,13 @@ fn should_parse(rule: Rule, source: impl AsRef<str>) {
 }
 
 #[test]
-fn test_script_name() {
+fn test_header() {
 	for case in [
 		"Scriptname Test Hidden",
 		"Scriptname Test Extends Another",
 		"ScriptName Test Extends Another Conditional",
 	] {
-		should_parse(Rule::script_name, case);
+		should_parse(Rule::header, case);
 	}
 }
 
@@ -94,7 +94,8 @@ fn test_if() {
 fn test_while() {
 	for case in [
 		"while true endwhile",
-		"while 2 + 7 endwhile",
+		"while i < actorArray.Length endwhile",
+		"while 2 + 7 < foo.bar endwhile",
 		"while true int x = 5 endwhile",
 	] {
 		should_parse(Rule::r#while, case);
