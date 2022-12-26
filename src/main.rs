@@ -1,5 +1,3 @@
-use pest::Parser;
-
 #[macro_use]
 extern crate pest_derive;
 
@@ -7,12 +5,14 @@ extern crate pest_derive;
 #[grammar = "papyrus.pest"]
 pub struct PapyrusParser;
 
-mod parse;
 mod error;
+mod parse;
 
 fn wrapper() -> error::Result<()> {
 	let src = "
-		foo[5][3].bar = 55
+		hmm = new int[5]
+
+		x = foo + 5
 	";
 
 	let out = parse::parse_module(src)?;
@@ -20,7 +20,6 @@ fn wrapper() -> error::Result<()> {
 
 	Ok(())
 }
-
 
 fn main() {
 	if let Err(err) = wrapper() {

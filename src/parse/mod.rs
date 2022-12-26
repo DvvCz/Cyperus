@@ -1,10 +1,13 @@
-mod expression;
 mod ast;
 mod error;
+mod expression;
 
+use ast::{Ast, Expression, Index, Parameter, ScriptInfo, Statement};
 pub use error::{Error, Result};
-use pest::{Parser, iterators::{Pair, Pairs}};
-use ast::{Type, Index, Statement, Expression, Parameter, ScriptInfo, Ast};
+use pest::{
+	iterators::{Pair, Pairs},
+	Parser,
+};
 
 #[derive(Parser)]
 #[grammar = "papyrus.pest"]
@@ -49,7 +52,9 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 		Ok(Parameter(
 			inner.expect_rule(Rule::ident)?.ident(),
 			inner.expect_rule(Rule::r#type)?.ty(),
-			inner.opt_rule(Rule::expression).map(|e| e.expression().ok()).flatten(),
+			inner
+				.opt_rule(Rule::expression)
+				.and_then(|e| e.expression().ok()),
 		))
 	}
 
@@ -63,7 +68,10 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 				let mut elifs = vec![];
 				for elif in inner.next().unwrap().into_inner() {
 					let mut inner = elif.into_inner();
-					elifs.push((inner.expect_rule(Rule::expression)?.expression()?, inner.expect_rule(Rule::body)?.body()?));
+					elifs.push((
+						inner.expect_rule(Rule::expression)?.expression()?,
+						inner.expect_rule(Rule::body)?.body()?,
+					));
 				}
 
 				Statement::If {
@@ -71,20 +79,27 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 					body,
 
 					elifs,
-					else_block: inner.opt_rule(Rule::body).map(|x| x.body().ok()).flatten()
+					else_block: inner.opt_rule(Rule::body).and_then(|x| x.body().ok()),
 				}
-			},
+			}
 
 			Rule::full_property => Statement::PropertyFull {
 				ty: inner.expect_rule(Rule::r#type)?.ty(),
 				name: inner.expect_rule(Rule::ident)?.ident(),
-				functions: (inner.expect_rule(Rule::expression)?.expression()?, inner.opt_rule(Rule::expression).map(|e| e.expression().ok()).flatten()),
+				functions: (
+					inner.expect_rule(Rule::expression)?.expression()?,
+					inner
+						.opt_rule(Rule::expression)
+						.and_then(|e| e.expression().ok()),
+				),
 			},
 
 			Rule::auto_property => Statement::PropertyAuto {
 				ty: inner.expect_rule(Rule::r#type)?.ty(),
 				name: inner.expect_rule(Rule::ident)?.ident(),
-				value: inner.opt_rule(Rule::expression).map(|e| e.expression().ok()).flatten(),
+				value: inner
+					.opt_rule(Rule::expression)
+					.and_then(|e| e.expression().ok()),
 			},
 
 			Rule::const_property => Statement::PropertyAutoConst {
@@ -108,25 +123,33 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 			Rule::native_function => Statement::NativeFunction {
 				return_type: inner.opt_rule(Rule::ident).map(PestNode::ident),
 				name: inner.expect_rule(Rule::ident)?.ident(),
-				parameters: next_inner(&mut inner).map(PestNode::param).collect::<Result<Vec<_>>>()?,
+				parameters: next_inner(&mut inner)
+					.map(PestNode::param)
+					.collect::<Result<Vec<_>>>()?,
 			},
 
 			Rule::global_function => Statement::Function {
 				return_type: inner.opt_rule(Rule::ident).map(PestNode::ident),
 				name: inner.expect_rule(Rule::ident)?.ident(),
-				parameters: next_inner(&mut inner).map(PestNode::param).collect::<Result<Vec<_>>>()?,
+				parameters: next_inner(&mut inner)
+					.map(PestNode::param)
+					.collect::<Result<Vec<_>>>()?,
 				body: inner.expect_rule(Rule::body)?.body()?,
 			},
 
 			Rule::method_function => Statement::Function {
 				return_type: inner.opt_rule(Rule::ident).map(PestNode::ident),
 				name: inner.expect_rule(Rule::ident)?.ident(),
-				parameters: next_inner(&mut inner).map(PestNode::param).collect::<Result<Vec<_>>>()?,
+				parameters: next_inner(&mut inner)
+					.map(PestNode::param)
+					.collect::<Result<Vec<_>>>()?,
 				body: inner.expect_rule(Rule::body)?.body()?,
 			},
 
 			Rule::r#return => Statement::Return {
-				value: inner.opt_rule(Rule::expression).map(|e| e.expression().ok()).flatten(),
+				value: inner
+					.opt_rule(Rule::expression)
+					.and_then(|e| e.expression().ok()),
 			},
 
 			Rule::definition => Statement::Definition {
@@ -137,7 +160,9 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 
 			Rule::event => Statement::Event {
 				name: inner.expect_rule(Rule::ident)?.ident(),
-				parameters: next_inner(&mut inner).map(PestNode::param).collect::<Result<Vec<_>>>()?,
+				parameters: next_inner(&mut inner)
+					.map(PestNode::param)
+					.collect::<Result<Vec<_>>>()?,
 				body: inner.expect_rule(Rule::body)?.body()?,
 			},
 
@@ -152,9 +177,12 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 				let mut indexes = vec![];
 				while let Some(p) = inner.peek() {
 					match p.as_rule() {
-						Rule::bracket_index => indexes.push(Index::Bracket(p.into_inner().expect_rule(Rule::expression)?.expression()?)),
-						Rule::dot_index => indexes.push(Index::Dot(p.into_inner().expect_rule(Rule::ident)?.ident())),
-						_ => break
+						Rule::bracket_index => indexes.push(Index::Bracket(
+							p.into_inner().expect_rule(Rule::expression)?.expression()?,
+						)),
+						Rule::dot_index => indexes
+							.push(Index::Dot(p.into_inner().expect_rule(Rule::ident)?.ident())),
+						_ => break,
 					}
 					inner.next();
 				}
@@ -162,16 +190,20 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 				Statement::Assignment {
 					name,
 					indexes,
-					value: inner.expect_rule(Rule::expression)?.expression()?
+					value: inner.expect_rule(Rule::expression)?.expression()?,
 				}
-			},
+			}
 
 			Rule::group => Statement::Group {
 				name: inner.expect_rule(Rule::ident)?.ident(),
 				properties: inner.expect_rule(Rule::body)?.body()?,
 			},
 
-			_ => todo!("Unimplemented: {rule:?}")
+			Rule::expression => Statement::Expression {
+				expr: inner.expect_rule(Rule::expression)?.expression()?,
+			},
+
+			_ => todo!("{rule:?}"),
 		};
 
 		Ok(out)
@@ -208,15 +240,15 @@ impl<'a> PestNode<'a> for Pair<'a, Rule> {
 			match op.as_rule() {
 				Rule::neg => Expression::Negate(Box::new(rhs)),
 				Rule::not => Expression::Not(Box::new(rhs)),
-				rule => unreachable!("Expected prefix operation, found {:?}", rule)
+				rule => unreachable!("Expected prefix operation, found {:?}", rule),
 			}
 		}
 
 		fn postfix(lhs: Expression, op: Pair<Rule>) -> Expression {
 			match op.as_rule() {
-				Rule::cast => Expression::Cast(Box::new(lhs), op.into_inner().as_str().to_owned()),
-				Rule::type_check => Expression::Is(Box::new(lhs), op.into_inner().as_str().to_owned()),
-				rule => unreachable!("Expected postfix operation, found {:?}", rule)
+				Rule::cast => Expression::Cast(Box::new(lhs), op.ident()),
+				Rule::type_check => Expression::Is(Box::new(lhs), op.ident()),
+				rule => unreachable!("Expected postfix operation, found {:?}", rule),
 			}
 		}
 
@@ -246,8 +278,8 @@ impl<'a> PestWalker for Pairs<'a, Rule> {
 				} else {
 					Err(Error::Expected(expecting, got))
 				}
-			},
-			None => Err(Error::Expected(expecting, Rule::EOI))
+			}
+			None => Err(Error::Expected(expecting, Rule::EOI)),
 		}
 	}
 
@@ -257,7 +289,7 @@ impl<'a> PestWalker for Pairs<'a, Rule> {
 				self.next();
 				Some(pair)
 			}
-			_ => None
+			_ => None,
 		}
 	}
 }
@@ -269,29 +301,24 @@ pub fn parse_module(source: impl AsRef<str>) -> Result<Ast> {
 	let mut statements = vec![];
 	let mut script_info = ScriptInfo::default();
 
-	for item in pairs.into_iter() {
+	for item in pairs {
 		match item.as_rule() {
-			Rule::heading => {
-				let item = item.into_inner().next().unwrap();
-				match item.as_rule() {
-					Rule::script_name => {
-						let mut inner = item.into_inner();
-						script_info.script_name = inner.expect_rule(Rule::ident)?.ident();
-						script_info.extended_type = inner.opt_rule(Rule::r#type).map(PestNode::ty);
-						script_info.is_conditional = inner.peek().is_some();
-					}
-					_ => unreachable!(),
-				}
+			Rule::script_name => {
+				let mut inner = item.into_inner();
+				script_info.script_name = inner.expect_rule(Rule::ident)?.ident();
+				script_info.extended_type = inner.opt_rule(Rule::r#type).map(PestNode::ty);
+				script_info.is_conditional = inner.peek().is_some();
 			}
 
 			Rule::body => {
-				for pair in item.into_inner() {
-					statements.push(pair.statement()?);
-				}
+				statements.extend(
+					item.into_inner()
+						.map(PestNode::statement)
+						.collect::<Result<Vec<_>>>()?,
+				);
 			}
 
 			Rule::EOI => (),
-
 			unknown => todo!("parse_module {unknown:#?} {}", item.as_str()),
 		}
 	}

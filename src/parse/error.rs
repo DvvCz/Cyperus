@@ -1,5 +1,5 @@
-use thiserror::Error;
 use super::Rule;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {

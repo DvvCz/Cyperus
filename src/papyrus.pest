@@ -4,7 +4,8 @@ COMMENT = _{ multiline_style1 | multiline_style2 | line_comment }
 	multiline_style2 = _{";/" ~ (!"/;" ~ ANY)* ~ "/;"}
 	line_comment = _{";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE}
 
-module = _ { SOI ~ heading* ~ body ~ EOI }
+module = _ { SOI ~ script_name? ~ body ~ EOI }
+	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ ^"Conditional"? }
 
 keyword = _{
 	^"Function" | ^"EndFunction" |
@@ -23,12 +24,9 @@ keyword = _{
 
 type = ${ ident ~ "[]"? }
 
-heading = _{ script_name }
-	script_name = { ^"ScriptName" ~ ident ~ (^"Hidden" | (^"Extends" ~ type)) ~ ^"Conditional"? }
-
-
 body = { (statement | expression)* }
 
+// Todo: Make statement not silent
 statement = _{ if | while | group | event | state | property | function | definition | assignment | compound_assignment | return | declaration }
 	group = { ^"Group" ~ ident ~ ^"CollapsedOnRef"? ~ body ~ ^"EndGroup" }
 

@@ -72,10 +72,6 @@ pub enum Statement {
 		name: String,
 		value: Expression,
 	},
-	PropertyAutoConditional {
-		ty: Type,
-		name: String,
-	},
 
 	State {
 		auto: bool,
@@ -97,14 +93,19 @@ pub enum Statement {
 	Assignment {
 		name: String,
 		indexes: Vec<Index>,
-		value: Expression
-	}
+		value: Expression,
+	},
+
+	/// Certain expressions (function calls) can be used as statements.
+	Expression {
+		expr: Expression,
+	},
 }
 
 #[derive(Debug)]
 pub enum Index {
 	Dot(String),
-	Bracket(Expression)
+	Bracket(Expression),
 }
 
 #[non_exhaustive]
