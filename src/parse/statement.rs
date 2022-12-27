@@ -1,6 +1,8 @@
-use crate::parse::{ast::Index};
+use crate::parse::ast::Index;
 
-use super::{Rule, Result, Statement, PestNode, PestWalker, expression::ParseExpression, ast::Parameter};
+use super::{
+	ast::Parameter, expression::ParseExpression, PestNode, PestWalker, Result, Rule, Statement,
+};
 use pest::iterators::Pair;
 
 pub(crate) trait ParseStatement: ParseExpression {
@@ -28,7 +30,9 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 	}
 
 	fn params(self) -> Result<Vec<Parameter>> {
-		self.into_inner().map(Self::param).collect::<Result<Vec<_>>>()
+		self.into_inner()
+			.map(Self::param)
+			.collect::<Result<Vec<_>>>()
 	}
 
 	fn statement(self) -> Result<Statement> {
@@ -38,15 +42,20 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 		let out = match rule {
 			Rule::r#if => {
 				let cond = inner.expect_rule(Rule::expression)?.expression()?;
-				let body = inner.expect_rule(Rule::body)?.body()?;
+				let body = inner.opt_rule(Rule::body).and_then(|b| b.body().ok()).unwrap_or(vec![]);
 
 				let mut elifs = vec![];
-				for elif in inner.next().unwrap().into_inner() {
-					let mut inner = elif.into_inner();
-					elifs.push((
-						inner.expect_rule(Rule::expression)?.expression()?,
-						inner.expect_rule(Rule::body)?.body()?,
-					));
+				while let Some(elif) = inner.peek() {
+					if elif.as_rule() == Rule::r#elseif {
+						inner.next();
+						let mut inner = elif.into_inner();
+						elifs.push((
+							inner.expect_rule(Rule::expression)?.expression()?,
+							inner.expect_rule(Rule::body)?.body()?,
+						));
+					} else {
+						break;
+					}
 				}
 
 				Statement::If {
@@ -56,7 +65,12 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 					elifs,
 					else_block: inner.opt_rule(Rule::body).and_then(|x| x.body().ok()),
 				}
-			}
+			},
+
+			Rule::r#while => Statement::While {
+				cond: inner.expect_rule(Rule::expression)?.expression()?,
+				body: inner.expect_rule(Rule::body)?.body()?,
+			},
 
 			Rule::full_property => Statement::PropertyFull {
 				ty: inner.expect_rule(Rule::r#type)?.ty(),
@@ -130,11 +144,6 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 			Rule::event => Statement::Event {
 				name: inner.expect_rule(Rule::ident)?.ident(),
 				parameters: inner.expect_rule(Rule::parameters)?.params()?,
-				body: inner.expect_rule(Rule::body)?.body()?,
-			},
-
-			Rule::r#while => Statement::While {
-				cond: inner.expect_rule(Rule::expression)?.expression()?,
 				body: inner.expect_rule(Rule::body)?.body()?,
 			},
 

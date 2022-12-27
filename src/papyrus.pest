@@ -55,9 +55,9 @@ statement = { if | while | group | event | state | struct | property | function 
 	event = { ^"Event" ~ ident ~ parameters ~ body ~ ^"EndEvent" }
 
 	// Control flow
-	if = { ^"If" ~ expression ~ body ~ elseif* ~ else ~ ^"EndIf" }
-		elseif = { ^"ElseIf" ~ expression }
-		else = { ^"Else" ~ body }
+	if = { ^"If" ~ expression ~ (!elseif ~ body)? ~ elseif* ~ else? ~ ^"EndIf" }
+		elseif = { ^"ElseIf" ~ expression ~ body }
+		else = _{ ^"Else" ~ body }
 	while = { ^"While" ~ expression ~ body ~ ^"EndWhile" }
 
 	function = _{ native_function | global_function | method_function }
