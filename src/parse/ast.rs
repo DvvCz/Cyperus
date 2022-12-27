@@ -136,6 +136,12 @@ pub enum Expression {
 	/// !=
 	NotEqual(Box<Self>, Box<Self>),
 
+	/// &&
+	And(Box<Self>, Box<Self>),
+
+	/// ||
+	Or(Box<Self>, Box<Self>),
+
 	/// !
 	Not(Box<Self>),
 
@@ -155,7 +161,7 @@ pub enum Expression {
 	BracketIndex(Box<Self>, Box<Self>),
 
 	/// foo(bar.qux, "baz", 123)
-	Call(Box<Self>, Vec<Self>),
+	Call(Box<Self>, Vec<Argument>),
 
 	/// Hello
 	Ident(String),
@@ -178,3 +184,9 @@ pub enum Expression {
 
 #[derive(Debug)]
 pub struct Parameter(pub Type, pub String, pub Option<Expression>);
+
+#[derive(Debug)]
+pub enum Argument {
+	Named(String, Expression),
+	Anonymous(Expression)
+}

@@ -38,8 +38,7 @@ type = ${ (!keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* )) ~ (WHITESPA
 
 body = { (statement | expression)* }
 
-// Todo: Make statement not silent
-statement = _{ if | while | group | event | state | struct | property | function | definition | assignment | compound_assignment | return | declaration }
+statement = { if | while | group | event | state | struct | property | function | definition | assignment | compound_assignment | return | declaration }
 	group = { ^"Group" ~ ident ~ (^"CollapsedOnRef" | ^"CollapsedOnBase" | ^"Collapsed")? ~ body ~ ^"EndGroup" }
 
 	property = _{ full_property | const_property | auto_property }
@@ -56,8 +55,9 @@ statement = _{ if | while | group | event | state | struct | property | function
 	event = { ^"Event" ~ ident ~ parameters ~ body ~ ^"EndEvent" }
 
 	// Control flow
-	if = { ^"If" ~ expression ~ body ~ elifs ~ (^"Else" ~ body)? ~ ^"EndIf" }
-		elifs = { (^"ElseIf" ~ expression ~ body)* }
+	if = { ^"If" ~ expression ~ body ~ elseif* ~ else ~ ^"EndIf" }
+		elseif = { ^"ElseIf" ~ expression }
+		else = { ^"Else" ~ body }
 	while = { ^"While" ~ expression ~ body ~ ^"EndWhile" }
 
 	function = _{ native_function | global_function | method_function }
@@ -93,7 +93,9 @@ expression = { expr ~ (infix ~ expr)* }
 			op_gt = { ">" }
 			op_leq = { "<=" }
 			op_lt = { "<" }
-		logical = { "&&" | "||" }
+		logical = _{ op_and | op_or }
+			op_and = { "&&" }
+			op_or = { "||" }
 	prefix = _{ neg | not } // might have + operator too.
 		neg = { "-" }
 		not = { "!" }
