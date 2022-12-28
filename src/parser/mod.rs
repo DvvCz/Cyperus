@@ -2,8 +2,8 @@
 #[grammar = "papyrus.pest"]
 pub struct PestParser;
 
-mod ast;
 mod error;
+pub(crate) mod ast;
 mod expression;
 mod statement;
 
