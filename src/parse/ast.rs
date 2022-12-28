@@ -188,5 +188,5 @@ pub struct Parameter(pub Type, pub String, pub Option<Expression>);
 #[derive(Debug)]
 pub enum Argument {
 	Named(String, Expression),
-	Anonymous(Expression)
+	Anonymous(Expression),
 }

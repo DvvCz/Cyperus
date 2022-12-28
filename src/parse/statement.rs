@@ -15,7 +15,13 @@ pub(crate) trait ParseStatement: ParseExpression {
 
 impl<'a> ParseStatement for Pair<'a, Rule> {
 	fn body(self) -> Result<Vec<Statement>> {
-		self.into_inner().map(Self::statement).collect()
+		self.into_inner().map(|i| {
+			if i.as_rule() == Rule::statement {
+				i.statement()
+			} else {
+				i.expression().map(|e| Statement::Expression { expr: e })
+			}
+		}).collect()
 	}
 
 	fn param(self) -> Result<Parameter> {
@@ -42,7 +48,10 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 		let out = match rule {
 			Rule::r#if => {
 				let cond = inner.expect_rule(Rule::expression)?.expression()?;
-				let body = inner.opt_rule(Rule::body).and_then(|b| b.body().ok()).unwrap_or(vec![]);
+				let body = inner
+					.opt_rule(Rule::body)
+					.and_then(|b| b.body().ok())
+					.unwrap_or(vec![]);
 
 				let mut elifs = vec![];
 				while let Some(elif) = inner.peek() {
@@ -65,7 +74,7 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 					elifs,
 					else_block: inner.opt_rule(Rule::body).and_then(|x| x.body().ok()),
 				}
-			},
+			}
 
 			Rule::r#while => Statement::While {
 				cond: inner.expect_rule(Rule::expression)?.expression()?,
@@ -173,10 +182,6 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 			Rule::group => Statement::Group {
 				name: inner.expect_rule(Rule::ident)?.ident(),
 				properties: inner.expect_rule(Rule::body)?.body()?,
-			},
-
-			Rule::expression => Statement::Expression {
-				expr: inner.expect_rule(Rule::expression)?.expression()?,
 			},
 
 			Rule::declaration => Statement::Declaration {

@@ -1,5 +1,5 @@
 use super::ast::Argument;
-use super::{Rule, Result, Expression, PestNode, PestWalker, Error};
+use super::{Error, Expression, PestNode, PestWalker, Result, Rule};
 
 use once_cell::sync::Lazy;
 use pest::iterators::Pair;
@@ -40,16 +40,21 @@ pub(crate) trait ParseExpression: PestNode {
 
 impl<'a> ParseExpression for Pair<'a, Rule> {
 	fn arguments(self) -> Result<Vec<Argument>> {
-		self.into_inner().map(Self::argument).collect::<Result<Vec<_>>>()
+		self.into_inner()
+			.map(Self::argument)
+			.collect::<Result<Vec<_>>>()
 	}
 
 	fn argument(self) -> Result<Argument> {
 		// Parses a single argument passed to a function.
 		let mut inner = self.into_inner();
 		match inner.next() {
-			Some(pair) if pair.as_rule() == Rule::ident => Ok(Argument::Named(pair.ident(), inner.expect_rule(Rule::expression)?.expression()?)),
+			Some(pair) if pair.as_rule() == Rule::ident => Ok(Argument::Named(
+				pair.ident(),
+				inner.expect_rule(Rule::expression)?.expression()?,
+			)),
 			Some(pair) => Ok(Argument::Anonymous(pair.expression()?)),
-			None => Err(Error::UnexpectedEOI(Rule::expression))
+			None => Err(Error::UnexpectedEOI(Rule::expression)),
 		}
 	}
 
@@ -98,9 +103,7 @@ impl<'a> ParseExpression for Pair<'a, Rule> {
 				Rule::type_check => {
 					Expression::Is(Box::new(lhs), op.into_inner().next().unwrap().ident())
 				}
-				Rule::call => Expression::Call(
-					Box::new(lhs), op.arguments().unwrap()
-				),
+				Rule::call => Expression::Call(Box::new(lhs), op.into_inner().next().unwrap().arguments().unwrap()),
 				Rule::dot_index => {
 					Expression::DotIndex(Box::new(lhs), op.into_inner().next().unwrap().ident())
 				}

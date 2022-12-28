@@ -117,11 +117,11 @@ fn test_function() {
 #[test]
 fn test_compound_assignment() {
 	for case in [
-		"foo += 55",
-		"foo -= 55",
-		"foo *= 55",
-		"foo /= 55",
-		"foo %= 55",
+		"abc += 55",
+		"def -= 55",
+		"ghi *= 55",
+		"jkl /= 55",
+		"mno %= 55",
 	] {
 		should_parse(Rule::compound_assignment, case);
 	}
@@ -166,8 +166,9 @@ fn test_expression() {
 		"!(True && False)",
 		"2 != True",
 		"-x",
+		"saul()",
 		"MyFunction().MyProperty",
-		"(MyVariable as MyObject).MyFunction()[0]",
+		"(MyVariable as MyObject).MyFunction(2, 3)[0]",
 		"new float[5]",
 		"new int[x + 2]", // Note accepting a runtime expression here is specific to Fallout 4.
 	] {

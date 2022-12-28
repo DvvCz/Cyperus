@@ -23,7 +23,7 @@ keyword = @{
 
 		^"As" | ^"Auto" | ^"AutoReadOnly" | ^"BetaOnly" | ^"Collapsed" |
 		^"CollapsedOnBase" | ^"CollapsedOnRef" | ^"Conditional" | ^"Const" |
-		^"CustomEvent" | ^"DebugOnly" | ^"Default" | ^"Else" | ^"ElseIf"|
+		^"CustomEvent" | ^"DebugOnly" | ^"Default" | ^"ElseIf" | ^"Else" |
 		^"EndEvent" | ^"EndFunction" | ^"EndGroup" | ^"EndIf" | ^"EndProperty" |
 		^"EndState" | ^"EndStruct" | ^"EndWhile" | ^"Event" | ^"Extends" |
 		^"False" | ^"Function" | ^"Global" | ^"Group" | ^"Hidden" | ^"If" |
