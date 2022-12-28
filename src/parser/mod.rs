@@ -1,5 +1,5 @@
 #[derive(Parser)]
-#[grammar = "papyrus.pest"]
+#[grammar = "parser/papyrus.pest"]
 pub struct PestParser;
 
 mod error;
