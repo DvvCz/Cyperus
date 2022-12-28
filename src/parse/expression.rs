@@ -63,7 +63,7 @@ impl<'a> ParseExpression for Pair<'a, Rule> {
 		fn primary(prim: Pair<Rule>) -> Expression {
 			match prim.as_rule() {
 				Rule::ident => Expression::Ident(prim.ident()),
-				Rule::hexadecimal => Expression::Integer(prim.as_str().parse().unwrap()),
+				Rule::hexadecimal => Expression::Integer(i64::from_str_radix(prim.as_str().trim_start_matches("0x"), 16).unwrap()),
 				Rule::decimal => Expression::Float(prim.as_str().parse().unwrap()),
 				Rule::integer => Expression::Integer(prim.as_str().parse().unwrap()),
 				Rule::string => Expression::String(prim.as_str().to_owned()),
@@ -79,8 +79,15 @@ impl<'a> ParseExpression for Pair<'a, Rule> {
 				Rule::op_sub => Expression::Subtraction(Box::new(lhs), Box::new(rhs)),
 				Rule::op_mul => Expression::Multiplication(Box::new(lhs), Box::new(rhs)),
 				Rule::op_div => Expression::Division(Box::new(lhs), Box::new(rhs)),
+
+
+				Rule::op_gt => Expression::GreaterThan(Box::new(lhs), Box::new(rhs)),
+				Rule::op_lt => Expression::LessThan(Box::new(lhs), Box::new(rhs)),
+				Rule::op_geq => Expression::GreaterThanOrEqual(Box::new(lhs), Box::new(rhs)),
+				Rule::op_leq => Expression::LessThanOrEqual(Box::new(lhs), Box::new(rhs)),
 				Rule::op_eq => Expression::Equal(Box::new(lhs), Box::new(rhs)),
 				Rule::op_neq => Expression::NotEqual(Box::new(lhs), Box::new(rhs)),
+
 				Rule::op_and => Expression::And(Box::new(lhs), Box::new(rhs)),
 				Rule::op_or => Expression::Or(Box::new(lhs), Box::new(rhs)),
 				rule => unreachable!("Expected infix operation, found {:?}", rule),

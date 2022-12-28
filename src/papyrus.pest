@@ -46,7 +46,8 @@ statement = { if | while | group | event | state | struct | property | function 
 		const_property = { type ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" ~ (^"Mandatory" | ^"Hidden")* }
 		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ (^"Const" | ^"Mandatory" | ^"Conditional" | ^"Hidden")* ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional" | ^"Hidden")* }
 
-	struct = { ^"Struct" ~ ident ~ (type ~ ident ~ ("=" ~ expression)? ~ ^"Hidden"?) ~ ^"EndStruct" }
+	struct = { ^"Struct" ~ ident ~ struct_field+ ~ ^"EndStruct" }
+		struct_field = { type ~ ident ~ ("=" ~ expression)? ~ ^"Hidden"? }
 
 	state = _{ auto_state | normal_state }
 		auto_state = { ^"Auto" ~ ^"State" ~ ident ~ body ~ ^"EndState" }

@@ -1,7 +1,7 @@
 use crate::parse::ast::Index;
 
 use super::{
-	ast::Parameter, expression::ParseExpression, PestNode, PestWalker, Result, Rule, Statement,
+	ast::{Parameter, Field}, expression::ParseExpression, PestNode, PestWalker, Result, Rule, Statement,
 };
 use pest::iterators::Pair;
 
@@ -187,6 +187,24 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 			Rule::declaration => Statement::Declaration {
 				ty: inner.expect_rule(Rule::r#type)?.ty(),
 				name: inner.expect_rule(Rule::ident)?.ident(),
+			},
+
+			Rule::r#struct => {
+				fn struct_field(f: Pair<Rule>) -> Result<Field> {
+					let mut inner = f.into_inner();
+					Ok(Field(
+						inner.expect_rule(Rule::r#type)?.ty(),
+						inner.expect_rule(Rule::ident)?.ident(),
+						inner
+							.opt_rule(Rule::expression)
+							.and_then(|e| e.expression().ok())
+					))
+				}
+
+				Statement::Struct {
+					name: inner.expect_rule(Rule::ident)?.ident(),
+					fields: inner.map(struct_field).collect::<Result<Vec<_>>>()?
+				}
 			},
 
 			_ => todo!("{rule:?}"),

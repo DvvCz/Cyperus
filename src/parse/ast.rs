@@ -107,6 +107,11 @@ pub enum Statement {
 	Expression {
 		expr: Expression,
 	},
+
+	Struct {
+		name: String,
+		fields: Vec<Field>,
+	}
 }
 
 #[derive(Debug)]
@@ -129,6 +134,18 @@ pub enum Expression {
 
 	/// /
 	Division(Box<Self>, Box<Self>),
+
+	/// >
+	GreaterThan(Box<Self>, Box<Self>),
+
+	/// <
+	LessThan(Box<Self>, Box<Self>),
+
+	/// >=
+	GreaterThanOrEqual(Box<Self>, Box<Self>),
+
+	/// <=
+	LessThanOrEqual(Box<Self>, Box<Self>),
 
 	/// ==
 	Equal(Box<Self>, Box<Self>),
@@ -190,3 +207,6 @@ pub enum Argument {
 	Named(String, Expression),
 	Anonymous(Expression),
 }
+
+#[derive(Debug)]
+pub struct Field(pub Type, pub String, pub Option<Expression>);
