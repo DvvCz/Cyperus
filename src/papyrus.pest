@@ -1,4 +1,4 @@
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+WHITESPACE = _{ " " | "\t" | "\r" | ("\\" ~ ("\r" | "\n")) | "\n" }
 COMMENT = _{ multiline_style1 | multiline_style2 | line_comment }
 	multiline_style1 = _{"{" ~ (!"}" ~ ANY)* ~ "}"}
 	multiline_style2 = _{";/" ~ (!"/;" ~ ANY)* ~ "/;"}
@@ -27,27 +27,28 @@ keyword = @{
 		^"EndEvent" | ^"EndFunction" | ^"EndGroup" | ^"EndIf" | ^"EndProperty" |
 		^"EndState" | ^"EndStruct" | ^"EndWhile" | ^"Event" | ^"Extends" |
 		^"False" | ^"Function" | ^"Global" | ^"Group" | ^"Hidden" | ^"If" |
-		^"Import" | ^"Is" /*| ^"Length"*/ | ^"Mandatory" | ^"Native" | ^"New" |
-		^"None" | ^"Parent" | ^"Property" | ^"Return" | ^"ScriptName" |
+		^"Import" | ^"Is" | /*^"Length" |*/ ^"Mandatory" | ^"Native" | ^"New" |
+		^"None" | /*^"Parent" |*/ ^"Property" | ^"Return" | ^"ScriptName" |
 		/*^"Self" |*/ ^"State" | ^"Struct" | ^"True" | ^"While"
 	) ~ !ASCII_ALPHANUMERIC
 }
 
-type = ${ (!keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* )) ~ (WHITESPACE? ~ "[]")? }
-
+type = ${ ident ~ (WHITESPACE? ~ "[]")? }
 
 body = { (statement | expression)* }
 
-statement = { if | while | group | event | state | struct | property | function | definition | assignment | compound_assignment | return | declaration }
+statement = { if | while | group | event | state | struct | import | property | function | definition | assignment | compound_assignment | return | declaration }
 	group = { ^"Group" ~ ident ~ (^"CollapsedOnRef" | ^"CollapsedOnBase" | ^"Collapsed")? ~ body ~ ^"EndGroup" }
 
 	property = _{ full_property | const_property | auto_property }
-		full_property = { type ~ ^"Property" ~ ident ~ (function ~ function?) ~ ^"EndProperty" ~ (^"Mandatory" | ^"Hidden")* }
+		full_property = { type ~ ^"Property" ~ ident ~ (statement ~ statement?) ~ ^"EndProperty" ~ (^"Mandatory" | ^"Hidden")* }
 		const_property = { type ~ ^"Property" ~ ident ~ "=" ~ expression ~ ^"AutoReadOnly" ~ (^"Mandatory" | ^"Hidden")* }
 		auto_property = { type ~ ^"Property" ~ ident ~ ("=" ~ expression)? ~ (^"Const" | ^"Mandatory" | ^"Conditional" | ^"Hidden")* ~ ^"Auto" ~ (^"Const" | ^"Mandatory" | ^"Conditional" | ^"Hidden")* }
 
 	struct = { ^"Struct" ~ ident ~ struct_field+ ~ ^"EndStruct" }
 		struct_field = { type ~ ident ~ ("=" ~ expression)? ~ ^"Hidden"? }
+
+	import = { ^"Import" ~ ident }
 
 	state = _{ auto_state | normal_state }
 		auto_state = { ^"Auto" ~ ^"State" ~ ident ~ body ~ ^"EndState" }
@@ -62,15 +63,17 @@ statement = { if | while | group | event | state | struct | property | function 
 	while = { ^"While" ~ expression ~ body ~ ^"EndWhile" }
 
 	function = _{ native_function | global_function | method_function }
-		native_function = { type? ~ ^"Function" ~ ident ~ parameters ~ ^"Global"? ~ ^"Native" ~ ^"Global"? }
-		global_function = { type? ~ ^"Function" ~ ident ~ parameters ~ ^"Global" ~ body ~ ^"EndFunction" }
-		method_function = { type? ~ ^"Function" ~ ident ~ parameters ~ body ~ ^"EndFunction" }
+		native_function = { type? ~ ^"Function" ~ ident ~ parameters ~ ^"Global"? ~ ^"Native" ~ ^"Global"? ~ function_flags? }
+		global_function = { type? ~ ^"Function" ~ ident ~ parameters ~ ^"Global" ~ function_flags? ~ body ~ ^"EndFunction" }
+		method_function = { type? ~ ^"Function" ~ ident ~ parameters ~ function_flags? ~ body ~ ^"EndFunction" }
+			function_flags = _{ ^"DebugOnly" | ^"BetaOnly" }
 	return = { ^"Return" ~ expression? }
 
 	assignment = { ident ~ (dot_index | bracket_index)* ~ "=" ~ expression }
 		dot_index = { "." ~ ident }
 		bracket_index = { "[" ~ expression ~ "]" }
-	compound_assignment = { ident ~ ("+=" | "-=" | "*=" | "/=" | "%=") ~ expression }
+	compound_assignment = { ident ~ comp_op ~ expression }
+		comp_op = _{ (op_add | op_sub | op_mul | op_div | op_mod) ~ "=" }
 
 	definition = { type ~ ident ~ "=" ~ expression ~ ^"Const"? }
 	declaration = ${ type ~ (WHITESPACE | COMMENT) ~ ident ~ ((WHITESPACE | COMMENT) ~ ^"Const")? ~ (WHITESPACE | COMMENT | EOI) }
@@ -108,13 +111,15 @@ expression = { expr ~ (infix ~ expr)* }
 		type_check = { ^"Is" ~ type }
 
 operand = _{ "(" ~ expression ~ ")" | literal | ident }
-	literal = _{ string | number | boolean | none | array }
+	literal = _{ string | number | boolean | none | new_array | new_struct }
 		string = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" } // Todo: Escapes
 		number = _{ hexadecimal | decimal | integer }
 			hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
 			decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "f"? }
 			integer = @{ ASCII_DIGIT+ }
 		boolean = { ^"True" | ^"False" }
-		array = { ^"New" ~ type ~ "[" ~ expression ~ "]" }
+		new_array = { ^"New" ~ type ~ "[" ~ expression ~ "]" }
+		new_struct = { ^"New" ~ type }
 		none = { ^"None" }
-	ident = @{ !keyword ~ ( ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ) }
+	ident = @{ ident_frag ~ (":" ~ ident_frag)? }
+		ident_frag = _{ !keyword ~ ( (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* ) }

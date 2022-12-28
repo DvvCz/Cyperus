@@ -1,27 +1,31 @@
-use crate::parse::ast::Index;
+use crate::parse::ast::Field;
 
 use super::{
-	ast::{Parameter, Field}, expression::ParseExpression, PestNode, PestWalker, Result, Rule, Statement,
+	ast::{Parameter, Index},
+	expression::ParseExpression,
+	PestNode, PestWalker, Result, Rule, Statement,
 };
 use pest::iterators::Pair;
 
 pub(crate) trait ParseStatement: ParseExpression {
-	fn statement(self) -> Result<Statement>;
-	fn body(self) -> Result<Vec<Statement>>;
-
 	fn param(self) -> Result<Parameter>;
 	fn params(self) -> Result<Vec<Parameter>>;
+
+	fn statement(self) -> Result<Statement>;
+	fn body(self) -> Result<Vec<Statement>>;
 }
 
 impl<'a> ParseStatement for Pair<'a, Rule> {
 	fn body(self) -> Result<Vec<Statement>> {
-		self.into_inner().map(|i| {
-			if i.as_rule() == Rule::statement {
-				i.statement()
-			} else {
-				i.expression().map(|e| Statement::Expression { expr: e })
-			}
-		}).collect()
+		self.into_inner()
+			.map(|i| {
+				if i.as_rule() == Rule::statement {
+					i.statement()
+				} else {
+					i.expression().map(|e| Statement::Expression { expr: e })
+				}
+			})
+			.collect()
 	}
 
 	fn param(self) -> Result<Parameter> {
@@ -42,8 +46,8 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 	}
 
 	fn statement(self) -> Result<Statement> {
-		let inner = self.into_inner().next().unwrap();
-		let (rule, mut inner) = (inner.as_rule(), inner.into_inner());
+		let stmt = self.into_inner().next().unwrap();
+		let (rule, mut inner) = (stmt.as_rule(), stmt.into_inner());
 
 		let out = match rule {
 			Rule::r#if => {
@@ -51,7 +55,7 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 				let body = inner
 					.opt_rule(Rule::body)
 					.and_then(|b| b.body().ok())
-					.unwrap_or(vec![]);
+					.unwrap_or_default();
 
 				let mut elifs = vec![];
 				while let Some(elif) = inner.peek() {
@@ -61,7 +65,7 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 						elifs.push((
 							inner.expect_rule(Rule::expression)?.expression()?,
 							inner.expect_rule(Rule::body)?.body()?,
-						));
+							));
 					} else {
 						break;
 					}
@@ -74,7 +78,7 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 					elifs,
 					else_block: inner.opt_rule(Rule::body).and_then(|x| x.body().ok()),
 				}
-			}
+			},
 
 			Rule::r#while => Statement::While {
 				cond: inner.expect_rule(Rule::expression)?.expression()?,
@@ -85,10 +89,10 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 				ty: inner.expect_rule(Rule::r#type)?.ty(),
 				name: inner.expect_rule(Rule::ident)?.ident(),
 				functions: (
-					inner.expect_rule(Rule::expression)?.expression()?,
+					Box::new(inner.expect_rule(Rule::statement)?.statement()?),
 					inner
-						.opt_rule(Rule::expression)
-						.and_then(|e| e.expression().ok()),
+						.opt_rule(Rule::statement)
+						.and_then(|e| e.statement().ok().map(Box::new)),
 				),
 			},
 
@@ -189,6 +193,12 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 				name: inner.expect_rule(Rule::ident)?.ident(),
 			},
 
+			Rule::compound_assignment => Statement::CompoundAssignment {
+				name: inner.expect_rule(Rule::ident)?.ident(),
+				op: inner.next().unwrap().as_rule(),
+				value: inner.expect_rule(Rule::expression)?.expression()?,
+			},
+
 			Rule::r#struct => {
 				fn struct_field(f: Pair<Rule>) -> Result<Field> {
 					let mut inner = f.into_inner();
@@ -197,14 +207,18 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 						inner.expect_rule(Rule::ident)?.ident(),
 						inner
 							.opt_rule(Rule::expression)
-							.and_then(|e| e.expression().ok())
+							.and_then(|e| e.expression().ok()),
 					))
 				}
 
 				Statement::Struct {
 					name: inner.expect_rule(Rule::ident)?.ident(),
-					fields: inner.map(struct_field).collect::<Result<Vec<_>>>()?
+					fields: inner.map(struct_field).collect::<Result<Vec<_>>>()?,
 				}
+			}
+
+			Rule::import => Statement::Import {
+				item: inner.expect_rule(Rule::ident)?.ident(),
 			},
 
 			_ => todo!("{rule:?}"),

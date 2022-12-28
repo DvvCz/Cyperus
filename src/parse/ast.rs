@@ -60,7 +60,7 @@ pub enum Statement {
 	PropertyFull {
 		ty: Type,
 		name: String,
-		functions: (Expression, Option<Expression>),
+		functions: (Box<Self>, Option<Box<Self>>),
 	},
 
 	PropertyAuto {
@@ -103,6 +103,12 @@ pub enum Statement {
 		value: Expression,
 	},
 
+	CompoundAssignment {
+		name: String,
+		op: super::Rule,
+		value: Expression,
+	},
+
 	/// Certain expressions (function calls) can be used as statements.
 	Expression {
 		expr: Expression,
@@ -111,6 +117,11 @@ pub enum Statement {
 	Struct {
 		name: String,
 		fields: Vec<Field>,
+	},
+
+	/// Import ObjectReference
+	Import {
+		item: String
 	}
 }
 
@@ -195,8 +206,14 @@ pub enum Expression {
 	/// 0.4f or 0.2
 	Float(f64),
 
+	/// None
+	None,
+
 	/// new int[5]
-	Array(Type),
+	Array(Type, Box<Self>),
+
+	/// new test
+	Struct(Type),
 }
 
 #[derive(Debug)]

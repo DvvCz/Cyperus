@@ -51,12 +51,7 @@ impl<'a> PestWalker for Pairs<'a, Rule> {
 					self.next();
 					Ok(pair)
 				} else {
-					Err(Error::Expected(
-						expecting,
-						got,
-						pair.as_span().start(),
-						pair.as_span().end(),
-					))
+					Err(Error::Expected { expected: expecting, got, trace: pair.as_span().start_pos().line_col() })
 				}
 			}
 			None => Err(Error::UnexpectedEOI(expecting)),

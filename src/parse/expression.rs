@@ -63,13 +63,30 @@ impl<'a> ParseExpression for Pair<'a, Rule> {
 		fn primary(prim: Pair<Rule>) -> Expression {
 			match prim.as_rule() {
 				Rule::ident => Expression::Ident(prim.ident()),
-				Rule::hexadecimal => Expression::Integer(i64::from_str_radix(prim.as_str().trim_start_matches("0x"), 16).unwrap()),
+				Rule::hexadecimal => Expression::Integer(
+					i64::from_str_radix(prim.as_str().trim_start_matches("0x"), 16).unwrap(),
+				),
 				Rule::decimal => Expression::Float(prim.as_str().parse().unwrap()),
 				Rule::integer => Expression::Integer(prim.as_str().parse().unwrap()),
 				Rule::string => Expression::String(prim.as_str().to_owned()),
 				Rule::boolean => Expression::Bool(prim.as_str().to_lowercase() == "true"),
-				Rule::array => Expression::Array(prim.ty()),
-				unknown => todo!("expr: {unknown:#?}"),
+				Rule::new_array => {
+					let mut inner = prim.into_inner();
+					Expression::Array(
+						inner.expect_rule(Rule::r#type).unwrap().ty(),
+						Box::new(
+							inner
+								.expect_rule(Rule::expression)
+								.unwrap()
+								.expression()
+								.unwrap(),
+						),
+					)
+				}
+				Rule::new_struct => Expression::Struct(prim.into_inner().next().unwrap().ty()),
+				Rule::none => Expression::None,
+				Rule::expression => prim.expression().unwrap(), // for grouped expressions: "(" ~ expression ~ ")"
+				unknown => todo!("expr: {unknown:#?} at {:?}", prim.as_str()),
 			}
 		}
 
@@ -79,7 +96,6 @@ impl<'a> ParseExpression for Pair<'a, Rule> {
 				Rule::op_sub => Expression::Subtraction(Box::new(lhs), Box::new(rhs)),
 				Rule::op_mul => Expression::Multiplication(Box::new(lhs), Box::new(rhs)),
 				Rule::op_div => Expression::Division(Box::new(lhs), Box::new(rhs)),
-
 
 				Rule::op_gt => Expression::GreaterThan(Box::new(lhs), Box::new(rhs)),
 				Rule::op_lt => Expression::LessThan(Box::new(lhs), Box::new(rhs)),
@@ -110,7 +126,10 @@ impl<'a> ParseExpression for Pair<'a, Rule> {
 				Rule::type_check => {
 					Expression::Is(Box::new(lhs), op.into_inner().next().unwrap().ident())
 				}
-				Rule::call => Expression::Call(Box::new(lhs), op.into_inner().next().unwrap().arguments().unwrap()),
+				Rule::call => Expression::Call(
+					Box::new(lhs),
+					op.into_inner().next().unwrap().arguments().unwrap(),
+				),
 				Rule::dot_index => {
 					Expression::DotIndex(Box::new(lhs), op.into_inner().next().unwrap().ident())
 				}

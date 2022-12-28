@@ -29,3 +29,43 @@ fn test_f4se() {
 		}
 	}
 }
+
+#[test]
+#[cfg(not(feature = "ci"))]
+fn test_fallout_4() {
+	let dir = std::env::var("FALLOUT_4_DIR").expect("FALLOUT_4_DIR not set");
+	let dir = std::path::Path::new(&dir);
+
+	let scripts_dir = dir.join("Data").join("Scripts").join("Source");
+	for file in std::fs::read_dir(scripts_dir).unwrap() {
+		let file = file.unwrap();
+		let path = file.path();
+
+		if path.is_file() {
+			let script = std::fs::read_to_string(&path).unwrap();
+			if let Err(why) = parse_module(&script) {
+				panic!("{}: {why}", path.display());
+			}
+		}
+	}
+}
+
+#[test]
+#[cfg(not(feature = "ci"))]
+fn test_skyrim() {
+	let dir = std::env::var("SKYRIM_DIR").expect("SKYRIM_DIR not set");
+	let dir = std::path::Path::new(&dir);
+
+	let scripts_dir = dir.join("Data").join("Scripts").join("Source");
+	for file in std::fs::read_dir(scripts_dir).unwrap() {
+		let file = file.unwrap();
+		let path = file.path();
+
+		if path.is_file() {
+			let script = std::fs::read_to_string(&path).unwrap();
+			if let Err(why) = parse_module(&script) {
+				panic!("{}: {why}", path.display());
+			}
+		}
+	}
+}
