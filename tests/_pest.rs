@@ -2,7 +2,7 @@
 	Testing the papyrus pest grammar.
 */
 
-use cyperus::parse::{PestParser, Rule};
+use cyperus::parser::{PestParser, Rule};
 
 fn should_parse(rule: Rule, source: impl AsRef<str>) {
 	use pest::Parser;

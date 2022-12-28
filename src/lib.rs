@@ -2,7 +2,7 @@
 extern crate pest_derive;
 
 pub mod error;
-pub mod parse;
+pub mod parser;
 
 pub use error::Error;
-pub use parse::{parse_module, PestParser};
+pub use parser::{parse_module, PestParser};

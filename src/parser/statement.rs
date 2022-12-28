@@ -1,4 +1,4 @@
-use crate::parse::ast::Field;
+use crate::parser::ast::Field;
 
 use super::{
 	ast::{Parameter, Index},
