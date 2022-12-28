@@ -11,25 +11,15 @@ module = _ { SOI ~ header? ~ body ~ EOI }
 
 keyword = @{
 	(
-		/*
-			Skyrim Keywords
-			^"As" | ^"Auto" | ^"AutoReadOnly" | ^"Conditional" | ^"Else" | ^"ElseIf" |
-			^"EndEvent" | ^"EndFunction" | ^"EndIf" | ^"EndProperty" |^"EndState" |
-			^"EndWhile" | ^"Event" | ^"Extends" | ^"False" | ^"Function" | ^"Global" |
-			^"Hidden" | ^"If" | ^"Import" | ^"Length" | ^"Native" | ^"New" | ^"None" |
-			^"Parent" | ^"Property" | ^"Return" | ^"ScriptName" | ^"Self" | ^"State" |
-			^"True" | ^"While"
-		*/
-
 		^"As" | ^"Auto" | ^"AutoReadOnly" | ^"BetaOnly" | ^"Collapsed" |
 		^"CollapsedOnBase" | ^"CollapsedOnRef" | ^"Conditional" | ^"Const" |
 		^"CustomEvent" | ^"DebugOnly" | ^"Default" | ^"ElseIf" | ^"Else" |
 		^"EndEvent" | ^"EndFunction" | ^"EndGroup" | ^"EndIf" | ^"EndProperty" |
 		^"EndState" | ^"EndStruct" | ^"EndWhile" | ^"Event" | ^"Extends" |
 		^"False" | ^"Function" | ^"Global" | ^"Group" | ^"Hidden" | ^"If" |
-		^"Import" | ^"Is" | /*^"Length" |*/ ^"Mandatory" | ^"Native" | ^"New" |
-		^"None" | /*^"Parent" |*/ ^"Property" | ^"Return" | ^"ScriptName" |
-		/*^"Self" |*/ ^"State" | ^"Struct" | ^"True" | ^"While"
+		^"Import" | ^"Is" | ^"Mandatory" | ^"Native" | ^"New" |
+		^"None" | ^"Property" | ^"Return" | ^"ScriptName" |
+		^"State" | ^"Struct" | ^"True" | ^"While"
 	) ~ !ASCII_ALPHANUMERIC
 }
 
