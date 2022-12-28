@@ -11,6 +11,13 @@ fn should_parse(rule: Rule, source: impl AsRef<str>) {
 	}
 }
 
+fn should_not_parse(rule: Rule, source: impl AsRef<str>) {
+	use pest::Parser;
+	if let Ok(module) = PestParser::parse(rule, source.as_ref()) {
+		panic!("Should have failed to parse: {module}");
+	}
+}
+
 #[test]
 fn test_header() {
 	for case in [
@@ -231,5 +238,16 @@ fn test_struct() {
 		EndStruct",
 	] {
 		should_parse(Rule::r#struct, case);
+	}
+}
+
+#[test]
+fn test_whitespace() {
+	for case in ["int function test(int bar,  \t \\\nstring baz) endfunction"] {
+		should_parse(Rule::r#function, case);
+	}
+
+	for case in ["int function test(int bar, \nstring baz) endfunction"] {
+		should_not_parse(Rule::r#function, case);
 	}
 }
