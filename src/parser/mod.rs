@@ -2,8 +2,8 @@
 #[grammar = "parser/papyrus.pest"]
 pub struct PestParser;
 
-mod error;
 pub(crate) mod ast;
+mod error;
 mod expression;
 mod statement;
 
@@ -51,7 +51,11 @@ impl<'a> PestWalker for Pairs<'a, Rule> {
 					self.next();
 					Ok(pair)
 				} else {
-					Err(Error::Expected { expected: expecting, got, trace: pair.as_span().start_pos().line_col() })
+					Err(Error::Expected {
+						expected: expecting,
+						got,
+						trace: pair.as_span().start_pos().line_col(),
+					})
 				}
 			}
 			None => Err(Error::UnexpectedEOI(expecting)),

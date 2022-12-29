@@ -121,8 +121,8 @@ pub enum Statement {
 
 	/// Import ObjectReference
 	Import {
-		item: String
-	}
+		item: String,
+	},
 }
 
 #[derive(Debug)]
@@ -132,7 +132,7 @@ pub enum Index {
 }
 
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
 	/// +
 	Addition(Box<Self>, Box<Self>),
@@ -219,7 +219,7 @@ pub enum Expression {
 #[derive(Debug)]
 pub struct Parameter(pub Type, pub String, pub Option<Expression>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Argument {
 	Named(String, Expression),
 	Anonymous(Expression),

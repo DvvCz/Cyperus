@@ -1,7 +1,7 @@
 use crate::parser::ast::Field;
 
 use super::{
-	ast::{Parameter, Index},
+	ast::{Index, Parameter},
 	expression::ParseExpression,
 	PestNode, PestWalker, Result, Rule, Statement,
 };
@@ -65,7 +65,7 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 						elifs.push((
 							inner.expect_rule(Rule::expression)?.expression()?,
 							inner.expect_rule(Rule::body)?.body()?,
-							));
+						));
 					} else {
 						break;
 					}
@@ -78,7 +78,7 @@ impl<'a> ParseStatement for Pair<'a, Rule> {
 					elifs,
 					else_block: inner.opt_rule(Rule::body).and_then(|x| x.body().ok()),
 				}
-			},
+			}
 
 			Rule::r#while => Statement::While {
 				cond: inner.expect_rule(Rule::expression)?.expression()?,
