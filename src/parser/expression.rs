@@ -121,10 +121,10 @@ impl<'a> ParseExpression for Pair<'a, Rule> {
 		fn postfix(lhs: Expression, op: Pair<Rule>) -> Expression {
 			match op.as_rule() {
 				Rule::cast => {
-					Expression::Cast(Box::new(lhs), op.into_inner().next().unwrap().ident())
+					Expression::Cast(Box::new(lhs), op.into_inner().next().unwrap().ty())
 				}
 				Rule::type_check => {
-					Expression::Is(Box::new(lhs), op.into_inner().next().unwrap().ident())
+					Expression::Is(Box::new(lhs), op.into_inner().next().unwrap().ty())
 				}
 				Rule::call => Expression::Call(
 					Box::new(lhs),
