@@ -7,7 +7,9 @@ mod error;
 mod expression;
 mod statement;
 
-use ast::{Ast, Expression, ScriptInfo, Statement};
+use std::borrow::Cow;
+
+use ast::{Ast, Expression, ScriptInfo, Statement, Type};
 pub use error::Error;
 use pest::{
 	iterators::{Pair, Pairs},
@@ -16,7 +18,7 @@ use pest::{
 
 use self::statement::ParseStatement;
 
-type Result<T> = error::Result<'static, T>;
+type Result<T> = error::Result<T>;
 
 trait PestWalker {
 	fn expect_rule(&mut self, rule: Rule) -> Result<Pair<Rule>>;
@@ -27,7 +29,7 @@ trait PestWalker {
 /// Should only use these after using [PestWalker::expect_rule].
 pub(crate) trait PestNode {
 	fn ident(self) -> String;
-	fn ty(self) -> String;
+	fn ty(self) -> Type;
 }
 
 impl<'a> PestNode for Pair<'a, Rule> {
@@ -37,8 +39,16 @@ impl<'a> PestNode for Pair<'a, Rule> {
 	}
 
 	#[inline(always)]
-	fn ty(self) -> String {
-		self.as_str().to_owned()
+	fn ty(self) -> Type {
+		let mut inner = self.into_inner();
+
+		let frag = inner.next().unwrap().as_str().to_ascii_lowercase(); // Papyrus is case insensitive.
+
+		if inner.peek().is_some() {
+			Type::Array(frag)
+		} else {
+			Type::Class(frag)
+		}
 	}
 }
 

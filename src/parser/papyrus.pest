@@ -23,7 +23,8 @@ keyword = @{
 	) ~ !ASCII_ALPHANUMERIC
 }
 
-type = ${ ident ~ (WHITESPACE? ~ "[]")? }
+type = ${ ident ~ type_array_part? }
+	type_array_part = { "[]" }
 
 body = { NEWLINE* ~ (NEWLINE* ~ (statement | expression) ~ NEWLINE*)* }
 

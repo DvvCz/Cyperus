@@ -1,8 +1,10 @@
+use std::borrow::Cow;
+
 #[derive(Debug, Default)]
 pub struct ScriptInfo {
 	pub script_name: String,
 
-	pub extended_type: Option<String>,
+	pub extended_type: Option<Type>,
 	pub is_conditional: bool,
 }
 
@@ -13,7 +15,47 @@ pub struct Ast {
 	pub statements: Vec<Statement>,
 }
 
-pub type Type = String;
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+	Integer,
+	Float,
+	String,
+	Boolean,
+	None,
+
+	Array(String), // You can't have an array of arrays: https://www.creationkit.com/index.php?title=Arrays_(Papyrus)#Declaring_Arrays
+	Class(String),
+}
+
+impl Type {
+	#[inline]
+	pub fn frag(&self) -> &str {
+		match self {
+			Self::Integer => "integer",
+			Self::Float => "float",
+			Self::String => "string",
+			Self::Boolean => "bool",
+			Self::None => "none",
+
+			Self::Array(t) => t,
+			Self::Class(s) => s,
+		}
+	}
+}
+
+impl std::fmt::Display for Type {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Array(ty) => {
+				ty.fmt(f);
+				f.write_str("[]");
+			}
+
+			_ => f.write_str(self.frag())?,
+		}
+		Ok(())
+	}
+}
 
 #[non_exhaustive]
 #[derive(Debug)]

@@ -2,19 +2,19 @@
 use crate::parser::ast::*;
 
 pub trait Format {
-	fn format(self) -> String;
+	fn format(&self) -> String;
 }
 
 impl Format for Expression {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		match self {
 			Self::Struct(ty) => format!("new {ty}"),
 			Self::Array(ty, expr) => format!("new {ty}[{}]", expr.format()),
 			Self::Bool(val) => val.to_string(),
 			Self::Integer(i) => i.to_string(),
 			Self::Float(f) => f.to_string(),
-			Self::String(s) => s,
-			Self::Ident(i) => i,
+			Self::String(s) => s.to_owned(),
+			Self::Ident(i) => i.to_owned(),
 			Self::None => String::from("None"),
 
 			Self::Is(expr, ty) => format!("{} is {ty}", expr.format()),
@@ -53,7 +53,7 @@ impl Format for Expression {
 }
 
 impl<T: Format> Format for Vec<T> {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		if self.is_empty() {
 			String::new()
 		} else {
@@ -66,7 +66,7 @@ impl<T: Format> Format for Vec<T> {
 }
 
 impl Format for Argument {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		match self {
 			Self::Anonymous(expr) => expr.format(),
 			Self::Named(name, expr) => format!("{} = {}", name, expr.format()),
@@ -75,16 +75,16 @@ impl Format for Argument {
 }
 
 impl Format for Parameter {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		match self.2 {
-			Some(value) => format!("{} {} = {}", self.0, self.1, value.format()),
+			Some(ref value) => format!("{} {} = {}", self.0, self.1, value.format()),
 			None => format!("{} {}", self.0, self.1),
 		}
 	}
 }
 
 impl Format for Index {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		match self {
 			Self::Dot(i) => format!(".{i}"),
 			Self::Bracket(i) => format!("[{}]", i.format()),
@@ -93,7 +93,7 @@ impl Format for Index {
 }
 
 impl Format for crate::parser::Rule {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		match self {
 			Self::op_add => String::from("+"),
 			Self::op_sub => String::from("-"),
@@ -105,16 +105,16 @@ impl Format for crate::parser::Rule {
 }
 
 impl Format for Field {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		match self.2 {
-			Some(value) => format!("{} {} = {}", self.0, self.1, value.format()),
+			Some(ref value) => format!("{} {} = {}", self.0, self.1, value.format()),
 			None => format!("{} {}", self.0, self.1),
 		}
 	}
 }
 
 impl Format for Statement {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		match self {
 			Statement::If {
 				cond,
@@ -137,6 +137,7 @@ impl Format for Statement {
 					body.format(),
 					formatted_elifs,
 					else_block
+						.as_ref()
 						.map(|x| format!("else\n\t{}\n", x.format()))
 						.unwrap_or_default()
 				)
@@ -207,7 +208,7 @@ impl Format for Statement {
 			},
 
 			Statement::Return { value } => {
-				format!("return {}", value.map(Format::format).unwrap_or_default())
+				format!("return {}", value.as_ref().map(Format::format).unwrap_or_default())
 			}
 			Statement::Event {
 				name,
@@ -230,18 +231,18 @@ impl Format for Statement {
 			} => format!(
 				"{ty} property {name} {} {} endproperty",
 				functions.0.format(),
-				functions.1.map(|x| x.format()).unwrap_or_default()
+				functions.1.as_deref().map(Format::format).unwrap_or_default()
 			),
 			Statement::PropertyAuto { ty, name, value } => format!(
 				"{ty} property {name} = {} auto",
-				value.map(Format::format).unwrap_or_default()
+				value.as_ref().map(Format::format).unwrap_or_default()
 			),
 			Statement::PropertyAutoConst { ty, name, value } => {
 				format!("{ty} property {name} = {} AutoReadOnly", value.format())
 			}
 
 			Statement::State { auto, name, body } => {
-				if auto {
+				if *auto {
 					format!("state {}\n\t{}\nendstate", name, body.format())
 				} else {
 					format!("auto state {}\n\t{}\nendstate", name, body.format())
@@ -269,9 +270,9 @@ impl Format for Statement {
 }
 
 impl Format for Ast {
-	fn format(self) -> String {
+	fn format(&self) -> String {
 		self.statements
-			.into_iter()
+			.iter()
 			.map(Format::format)
 			.collect::<Vec<String>>()
 			.join("\n\n")
