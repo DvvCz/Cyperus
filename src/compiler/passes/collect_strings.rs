@@ -3,7 +3,8 @@ use super::*;
 pub(crate) struct CollectStrings;
 
 type Userdata = indexmap::IndexSet<String>;
-impl Pass<'_, Userdata> for CollectStrings {
+
+impl Pass<Userdata> for CollectStrings {
 	fn statement(stmt: &Statement, userdata: &mut Userdata) {
 		match stmt {
 			Statement::If { cond, elifs, .. } => {
@@ -12,29 +13,31 @@ impl Pass<'_, Userdata> for CollectStrings {
 				for elif in elifs {
 					Self::expression(&elif.0, userdata);
 				}
-			},
+			}
 
 			Statement::Declaration { ty, name } => {
-				userdata.insert(ty.frag().to_lowercase());
+				userdata.insert(ty.frag().to_owned());
 				userdata.insert(name.clone());
-			},
+			}
 
 			Statement::Definition { ty, name, .. } => {
 				userdata.insert(ty.frag().to_lowercase());
 				userdata.insert(name.clone());
-			},
+			}
 
 			Statement::Assignment { name, .. } => {
 				userdata.insert(name.clone());
-			},
-
-			Statement::While { cond, .. } => {
-				Self::expression(cond, userdata);
 			}
 
+			Statement::While { cond, .. } => Self::expression(cond, userdata),
 			Statement::Expression { expr } => Self::expression(expr, userdata),
 
-			Statement::Function { return_type, name, parameters, .. } => {
+			Statement::Function {
+				return_type,
+				name,
+				parameters,
+				..
+			} => {
 				if let Some(ty) = return_type {
 					userdata.insert(ty.frag().to_lowercase());
 				}
@@ -50,7 +53,11 @@ impl Pass<'_, Userdata> for CollectStrings {
 				userdata.insert(name.clone());
 			}
 
-			Statement::NativeFunction { return_type, name, parameters } => {
+			Statement::NativeFunction {
+				return_type,
+				name,
+				parameters,
+			} => {
 				if let Some(ty) = return_type {
 					userdata.insert(ty.frag().to_lowercase());
 				}
@@ -66,11 +73,15 @@ impl Pass<'_, Userdata> for CollectStrings {
 				userdata.insert(name.clone());
 			}
 
-			Statement::Return { value } => if let Some(val) = value {
-				Self::expression(val, userdata)
-			},
+			Statement::Return { value } => {
+				if let Some(val) = value {
+					Self::expression(val, userdata)
+				}
+			}
 
-			Statement::Event { name, parameters, .. } => {
+			Statement::Event {
+				name, parameters, ..
+			} => {
 				userdata.insert(name.clone());
 
 				for param in parameters {
@@ -80,7 +91,7 @@ impl Pass<'_, Userdata> for CollectStrings {
 						Self::expression(val, userdata);
 					}
 				}
-			},
+			}
 
 			Statement::PropertyAuto { ty, name, value } => {
 				userdata.insert(ty.frag().to_lowercase());
@@ -89,13 +100,13 @@ impl Pass<'_, Userdata> for CollectStrings {
 				if let Some(val) = value {
 					Self::expression(val, userdata);
 				}
-			},
+			}
 
 			Statement::PropertyAutoConst { ty, name, value } => {
 				userdata.insert(ty.frag().to_lowercase());
 				userdata.insert(name.clone());
 				Self::expression(value, userdata);
-			},
+			}
 
 			Statement::PropertyFull { ty, name, .. } => {
 				userdata.insert(ty.frag().to_lowercase());
@@ -104,11 +115,11 @@ impl Pass<'_, Userdata> for CollectStrings {
 
 			Statement::State { name, .. } => {
 				userdata.insert(name.clone());
-			},
+			}
 
 			Statement::Group { name, .. } => {
 				userdata.insert(name.clone());
-			},
+			}
 
 			Statement::Struct { name, fields } => {
 				userdata.insert(name.clone());
@@ -120,11 +131,11 @@ impl Pass<'_, Userdata> for CollectStrings {
 						Self::expression(val, userdata);
 					}
 				}
-			},
+			}
 
 			Statement::Import { item } => {
 				userdata.insert(item.clone());
-			},
+			}
 
 			Statement::CompoundAssignment { name, value, .. } => {
 				userdata.insert(name.clone());
@@ -135,10 +146,14 @@ impl Pass<'_, Userdata> for CollectStrings {
 
 	fn expression(expr: &Expression, userdata: &mut Userdata) {
 		match expr {
-			Expression::String(s) => { userdata.insert(s.clone()); },
-			Expression::Ident(s) => { userdata.insert(s.clone()); },
+			Expression::String(s) => {
+				userdata.insert(s.clone());
+			}
+			Expression::Ident(s) => {
+				userdata.insert(s.clone());
+			}
 
-			_ => ()
+			_ => (),
 		}
 	}
 }

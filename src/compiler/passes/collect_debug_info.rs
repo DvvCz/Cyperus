@@ -8,7 +8,7 @@ pub(crate) enum FunctionType {
 	Unknown = 0,
 	X,
 	Y,
-	Z
+	Z,
 }
 
 pub(crate) struct DebugFunction {
@@ -18,14 +18,12 @@ pub(crate) struct DebugFunction {
 	function_type: FunctionType,
 
 	// instruction => line in source
-	lines: Vec<u16>
+	lines: Vec<u16>,
 }
 
 type Userdata = Vec<DebugFunction>;
-impl Pass<'_, Userdata> for CollectDebugInfo {
-	fn statement(stmt: &Statement, userdata: &mut Userdata) {
-	}
+impl Pass<Userdata> for CollectDebugInfo {
+	fn statement(stmt: &Statement, userdata: &mut Userdata) {}
 
-	fn expression(expr: &Expression, userdata: &mut Userdata) {
-	}
+	fn expression(expr: &Expression, userdata: &mut Userdata) {}
 }

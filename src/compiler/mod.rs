@@ -6,20 +6,20 @@ use error::{Error, Result};
 // mod encode;
 mod passes;
 
-trait Pass<'pass, Userdata> {
-	fn statement(_: &'pass Statement, _: &'pass mut Userdata) {}
-	fn expression(_: &'pass Expression, _: &'pass mut Userdata) {}
+trait Pass<Userdata> {
+	fn statement(_: &Statement, _: &mut Userdata) {}
+	fn expression(_: &Expression, _: &mut Userdata) {}
 
-	fn enter_scope(_: &'pass mut Userdata) {}
-	fn exit_scope(_: &'pass mut Userdata) {}
+	fn enter_scope(_: &mut Userdata) {}
+	fn exit_scope(_: &mut Userdata) {}
 }
 
-trait AstWalk<'walk, Userdata, P: Pass<'walk, Userdata>> {
-	fn walk(&'walk self, userdata: &'walk mut Userdata);
+trait AstWalk<Userdata, P: Pass<Userdata>> {
+	fn walk(&self, userdata: &mut Userdata);
 }
 
-impl<'walk, Userdata, P: Pass<'walk, Userdata>, T: AstWalk<'walk, Userdata, P>> AstWalk<'walk, Userdata, P> for Vec<T> {
-	fn walk(&'walk self, userdata: &'walk mut Userdata) {
+impl<Userdata, P: Pass<Userdata>, T: AstWalk<Userdata, P>> AstWalk<Userdata, P> for Vec<T> {
+	fn walk(&self, userdata: &mut Userdata) {
 		P::enter_scope(userdata);
 		for x in self {
 			x.walk(userdata);
@@ -28,8 +28,8 @@ impl<'walk, Userdata, P: Pass<'walk, Userdata>, T: AstWalk<'walk, Userdata, P>> 
 	}
 }
 
-impl<'walk, Userdata, P: Pass<'walk, Userdata>> AstWalk<'walk, Userdata, P> for Statement {
-	fn walk(&'walk self, userdata: &'walk mut Userdata) {
+impl<Userdata, P: Pass<Userdata>> AstWalk<Userdata, P> for Statement {
+	fn walk(&self, userdata: &mut Userdata) {
 		match self {
 			Statement::If {
 				body,
@@ -82,7 +82,9 @@ trait FallibleAstWalk<Userdata, P: FalliblePass<Userdata>> {
 	fn walk(&self, userdata: &mut Userdata) -> Result<()>;
 }
 
-impl<Userdata, P: FalliblePass<Userdata>, T: FallibleAstWalk<Userdata, P>> FallibleAstWalk<Userdata, P> for Vec<T> {
+impl<Userdata, P: FalliblePass<Userdata>, T: FallibleAstWalk<Userdata, P>>
+	FallibleAstWalk<Userdata, P> for Vec<T>
+{
 	fn walk(&self, userdata: &mut Userdata) -> Result<()> {
 		P::enter_scope(userdata);
 		for elem in self {
@@ -135,10 +137,13 @@ impl<Userdata, P: FalliblePass<Userdata>> FallibleAstWalk<Userdata, P> for State
 	}
 }
 
-
 pub fn compile(ast: &Ast) -> Vec<u8> {
 	use indexmap::IndexSet;
-	use passes::{validate::{Validate, ValidationState}, collect_strings::CollectStrings, collect_objects::{CollectObjects, ObjectCollectionState}};
+	use passes::{
+		collect_objects::{CollectObjects, ObjectCollectionState},
+		collect_strings::CollectStrings,
+		validate::{Validate, ValidationState},
+	};
 
 	let mut state = ValidationState::default();
 	if let Err(why) = FallibleAstWalk::<_, Validate>::walk(&ast.statements, &mut state) {

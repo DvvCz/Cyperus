@@ -15,37 +15,43 @@ pub struct Ast {
 	pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone)]
-pub struct Type {
-	fragment: Cow<'static, str>,
-	is_array: bool
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+	Integer,
+	Float,
+	String,
+	Boolean,
+	None,
+
+	Array(String), // You can't have an array of arrays: https://www.creationkit.com/index.php?title=Arrays_(Papyrus)#Declaring_Arrays
+	Class(String),
 }
 
 impl Type {
-	pub const STRING: Self = Self { fragment: Cow::Borrowed("string"), is_array: false };
-	pub const INT: Self = Self { fragment: Cow::Borrowed("int"), is_array: false };
-	pub const FLOAT: Self = Self { fragment: Cow::Borrowed("float"), is_array: false };
-	pub const BOOL: Self = Self { fragment: Cow::Borrowed("bool"), is_array: false };
-	pub const NONE: Self = Self { fragment: Cow::Borrowed("none"), is_array: false };
+	#[inline]
+	pub fn frag(&self) -> &str {
+		match self {
+			Self::Integer => "integer",
+			Self::Float => "float",
+			Self::String => "string",
+			Self::Boolean => "bool",
+			Self::None => "none",
 
-	pub fn new(frag: Cow<'static, str>, is_array: bool) -> Self {
-		Self { fragment: frag, is_array }
-	}
-
-	pub fn frag(&self) -> &Cow<str> {
-		&self.fragment
-	}
-
-	pub fn is_array(&self) -> bool {
-		self.is_array
+			Self::Array(t) => t,
+			Self::Class(s) => s,
+		}
 	}
 }
 
 impl std::fmt::Display for Type {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(&self.fragment)?;
-		if self.is_array {
-			f.write_str("[]")?;
+		match self {
+			Self::Array(ty) => {
+				ty.fmt(f);
+				f.write_str("[]");
+			}
+
+			_ => f.write_str(self.frag())?,
 		}
 		Ok(())
 	}

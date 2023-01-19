@@ -9,7 +9,7 @@ mod statement;
 
 use std::borrow::Cow;
 
-use ast::{Ast, Expression, Type, ScriptInfo, Statement};
+use ast::{Ast, Expression, ScriptInfo, Statement, Type};
 pub use error::Error;
 use pest::{
 	iterators::{Pair, Pairs},
@@ -42,10 +42,13 @@ impl<'a> PestNode for Pair<'a, Rule> {
 	fn ty(self) -> Type {
 		let mut inner = self.into_inner();
 
-		let frag = inner.next().unwrap().as_str();
-		let is_array = inner.peek().is_some();
+		let frag = inner.next().unwrap().as_str().to_ascii_lowercase(); // Papyrus is case insensitive.
 
-		Type::new(Cow::Owned(frag.to_owned()), is_array)
+		if inner.peek().is_some() {
+			Type::Array(frag)
+		} else {
+			Type::Class(frag)
+		}
 	}
 }
 

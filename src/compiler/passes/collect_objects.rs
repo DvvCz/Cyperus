@@ -1,6 +1,9 @@
 use super::*;
-use hashbrown::{HashMap, HashSet};
 use indexmap::IndexSet;
+use std::{
+	borrow::Cow,
+	collections::{HashMap, HashSet},
+};
 
 pub(crate) struct CollectObjects;
 
@@ -11,7 +14,7 @@ pub(crate) enum VariableValue {
 	String(u16),
 	Integer(i32),
 	Float(f32),
-	Boolean(u8)
+	Boolean(u8),
 }
 
 #[derive(Debug)]
@@ -20,19 +23,19 @@ pub(crate) struct Variable {
 	type_name: u16,
 	user_flags: u32,
 
-	val: VariableValue
+	val: VariableValue,
 }
 
 #[derive(Debug)]
 pub(crate) struct Instruction {
 	op: u8,
-	arguments: Vec<VariableValue>
+	arguments: Vec<VariableValue>,
 }
 
 #[derive(Debug)]
 pub(crate) enum FunctionFlags {
 	Global = 0x01,
-	Native = 0x02
+	Native = 0x02,
 }
 
 #[derive(Debug)]
@@ -44,7 +47,7 @@ pub(crate) struct Function {
 	flags: FunctionFlags,
 	params: Vec<(u16, u16)>,
 	locals: Vec<(u16, u16)>,
-	instructions: Vec<Instruction>
+	instructions: Vec<Instruction>,
 }
 
 #[derive(Debug)]
@@ -52,7 +55,7 @@ enum PropertyValue {
 	Read(Function),
 	Write(Function),
 	ReadWrite(Function, Function),
-	AutoVar(u16)
+	AutoVar(u16),
 }
 
 #[derive(Debug)]
@@ -63,13 +66,13 @@ pub(crate) struct Property {
 	user_flags: u32,
 	flags: u8,
 
-	val: PropertyValue
+	val: PropertyValue,
 }
 
 #[derive(Debug)]
 pub(crate) struct State {
 	name: u16,
-	functions: Vec<Function>
+	functions: Vec<Function>,
 }
 
 #[derive(Debug)]
@@ -81,19 +84,19 @@ pub(crate) struct ObjectData {
 
 	variables: Vec<Variable>,
 	properties: Vec<Property>,
-	states: Vec<State>
+	states: Vec<State>,
 }
 
 #[derive(Debug)]
 pub(crate) struct Object {
 	name: u16, // string table index
 	size: u32,
-	data: Vec<ObjectData>
+	data: Vec<ObjectData>,
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Scope {
-	variables: HashMap<String, Type>
+	variables: HashMap<String, Type>,
 }
 
 #[derive(Debug, Default)]
@@ -101,10 +104,10 @@ pub(crate) struct ObjectCollectionState {
 	strings: IndexSet<String>,
 
 	scopes: Vec<Scope>,
-	objects: Vec<Object>
+	objects: Vec<Object>,
 }
 
-impl<'pass> ObjectCollectionState {
+impl ObjectCollectionState {
 	pub(crate) fn new(strings: IndexSet<String>) -> Self {
 		Self {
 			strings,
@@ -112,20 +115,20 @@ impl<'pass> ObjectCollectionState {
 		}
 	}
 
-	fn resolve_var(&'pass self, var: &'pass String) -> Option<&Type> {
+	fn resolve_var(&self, var: &String) -> Option<&Type> {
 		self.scopes.iter().rev().find_map(|x| x.variables.get(var))
 	}
 
 	// Prob want to replace this with string interning too. Or SmolStr?
-	fn solve_expr_type(&'pass mut self, expr: &'pass Expression) -> Option<&'pass Type> {
+	fn solve_expr_type<'a>(&'a self, expr: &'a Expression) -> Option<&'a Type> {
 		match expr {
 			Expression::Ident(i) => self.resolve_var(i),
-			Expression::String(_) => Some(&Type::STRING),
-			Expression::Integer(_) => Some(&Type::INT),
-			Expression::Float(_) => Some(&Type::FLOAT),
-			Expression::Bool(_) => Some(&Type::BOOL),
-			Expression::None => Some(&Type::NONE),
-			Expression::Array(ty, ..) => Some(&Type::new(ty.frag().clone(), true)), // todo: add is_array to it.
+			Expression::String(_) => Some(&Type::String),
+			Expression::Integer(_) => Some(&Type::Integer),
+			Expression::Float(_) => Some(&Type::Float),
+			Expression::Bool(_) => Some(&Type::Boolean),
+			Expression::None => Some(&Type::None),
+			Expression::Array(ty, ..) => Some(ty),
 
 			// lhs and rhs must match, verified in the validate pass.
 			Expression::Addition(lhs, ..) => self.solve_expr_type(lhs),
@@ -133,62 +136,59 @@ impl<'pass> ObjectCollectionState {
 			Expression::Multiplication(lhs, ..) => self.solve_expr_type(lhs),
 			Expression::Division(lhs, ..) => self.solve_expr_type(lhs),
 			// Expression::Modulus(lhs, ..) => Some(&TYPE_INTEGER),
-
-			Expression::Not(_) => Some(&Type::BOOL),
+			Expression::Not(_) => Some(&Type::Boolean),
 			Expression::Negate(un) => self.solve_expr_type(un),
 
-			Expression::Equal(..) => Some(&Type::BOOL),
-			Expression::NotEqual(..) => Some(&Type::BOOL),
-			Expression::GreaterThan(..) => Some(&Type::BOOL),
-			Expression::LessThan(..) => Some(&Type::BOOL),
-			Expression::GreaterThanOrEqual(..) => Some(&Type::BOOL),
-			Expression::LessThanOrEqual(..) => Some(&Type::BOOL),
+			Expression::Equal(..) => Some(&Type::Boolean),
+			Expression::NotEqual(..) => Some(&Type::Boolean),
+			Expression::GreaterThan(..) => Some(&Type::Boolean),
+			Expression::LessThan(..) => Some(&Type::Boolean),
+			Expression::GreaterThanOrEqual(..) => Some(&Type::Boolean),
+			Expression::LessThanOrEqual(..) => Some(&Type::Boolean),
 
-			Expression::And(..) => Some(&Type::BOOL),
-			Expression::Or(..) => Some(&Type::BOOL),
+			Expression::And(..) => Some(&Type::Boolean),
+			Expression::Or(..) => Some(&Type::Boolean),
 
 			Expression::Cast(_, to) => Some(to),
-			Expression::Is(..) => Some(&Type::BOOL),
+			Expression::Is(..) => Some(&Type::Boolean),
 
-			tricky => todo!("tricky {tricky:?}")
+			tricky => todo!("tricky {tricky:?}"),
 		}
 	}
 }
 
 type Userdata = ObjectCollectionState;
-impl<'pass> Pass<'pass, Userdata> for CollectObjects {
-	fn enter_scope(userdata: &'pass mut Userdata) {
+impl Pass<Userdata> for CollectObjects {
+	fn enter_scope(userdata: &mut Userdata) {
 		userdata.scopes.push(Scope::default());
 	}
 
-	fn exit_scope(userdata: &'pass mut Userdata) {
+	fn exit_scope(userdata: &mut Userdata) {
 		userdata.scopes.pop();
 	}
 
-	fn statement(stmt: &'pass Statement, userdata: &'pass mut Userdata) {
+	fn statement(stmt: &Statement, userdata: &mut Userdata) {
 		let scope = userdata.scopes.last_mut().unwrap();
 		match stmt {
 			Statement::Definition { ty, name, value } => {
 				// scope.variables.insert(name.clone(), userdata.strings.get(&ty.frag().to_lowercase()).unwrap().clone());
 			}
 			Statement::Expression { expr } => Self::expression(expr, userdata),
-			_ => ()
+			_ => (),
 		}
 	}
 
-	fn expression(expr: &'pass Expression, userdata: &'pass mut Userdata) {
+	fn expression(expr: &Expression, userdata: &mut Userdata) {
 		match expr {
-			Expression::DotIndex(lhs, ind) => {
-				match userdata.solve_expr_type(lhs) {
-					Some(ty) if ty.is_array() && ind == "Length" => {
-						println!("Getting length of an array");
-					},
-					None => panic!("Unable to resolve type ?? {lhs:?}"),
-					_ => (),
+			Expression::DotIndex(lhs, ind) => match userdata.solve_expr_type(lhs) {
+				Some(Type::Array(_)) if ind == "Length" => {
+					println!("Getting length of an array");
 				}
-			}
+				None => panic!("Unable to resolve type ?? {lhs:?}"),
+				_ => (),
+			},
 
-			_ => ()
+			_ => (),
 		}
 	}
 }
